@@ -146,6 +146,17 @@ Run:
 
 	lein run spring-config-hello-world.xml hello_world
 
+### Use bean ids
+
+You should get into the habbit of using ```id``` attributes to name
+your spring beans. If you don't, you may run into situations where you
+have more than one Spring bean defined. This happens when using
+```classpath*:``` (see below) and Spring finds your Spring bean
+definition files more than one time (e.g. when you classpath has more
+than one entry to a JAR containing the resource). If you use ```id```
+Spring will judge this as a *bean redefinition* instead of the
+definition of two separate beans. This can make a big difference!
+
 ## More to come
 
 OK, this is it for today. 
