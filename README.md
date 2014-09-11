@@ -175,8 +175,7 @@ Try this:
 
 	lein run spring-config-load-script.xml load_script_code
 
-You'll see that the Spring bean ```load_script_code``` has the value
- ```null```.
+You'll see that the Spring bean ```load_script_code``` has the value ```null```.
 
 **TODO: do this via classloader instead of plain file IO**
 
