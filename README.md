@@ -120,6 +120,8 @@ This builds an *uberjar* (which contains all JARs and resources in you
 project dependencies -- i.e. *classpath*) and then runs our Java-based
 driver and the Clojure-based driver.
 
+**TODO: show how to run the compiled Clojure code via -jar**
+
 ## Defining Clojure-based Spring beans
 
 Spring has several built-in instantiation strategies for beans. One of
@@ -146,16 +148,93 @@ Run:
 
 	lein run spring-config-hello-world.xml hello_world
 
+### Loading Clojure script files
+
+You can load Clojure script files via ```clojure.lang.Compiler/loadFile```:
+
+	  <bean id="load_script_code" 
+		class="clojure.lang.Compiler" 
+		factory-method="loadFile">
+		<constructor-arg value="src/main/clojure/no-namespace-scripts/script-code.clj" />
+	  </bean>
+
+Now run this:
+
+	lein run spring-config-load-script.xml
+
+You'll see the output of ```script-code.clj```. Notice that
+evalutation starts in namespace ```user```. We are **not loading a
+namespace but a *plain script*.** (I use dashes here - so this cannot
+be namespaces!)
+
+Loading a script file will usually not create any instances that you
+use as Spring beans. **You load this script for it's side effects**
+(i.e. *defines* or just the output in this simple example).
+
+Try this:
+
+	lein run spring-config-load-script.xml load_script_code
+
+You'll see that the Spring bean ```load_script_code``` has the value
+```null```. 
+
+**TODO: do this via classloader instead of plain file IO**
+
 ### Use bean ids
 
 You should get into the habbit of using ```id``` attributes to name
 your spring beans. If you don't, you may run into situations where you
-have more than one Spring bean defined. This happens when using
-```classpath*:``` (see below) and Spring finds your Spring bean
-definition files more than one time (e.g. when you classpath has more
-than one entry to a JAR containing the resource). If you use ```id```
-Spring will judge this as a *bean redefinition* instead of the
-definition of two separate beans. This can make a big difference!
+have more than one Spring **bean** defined.
+
+This happens when using ```classpath*:``` and Spring finds your Spring
+bean definition files more than one time (e.g. when your classpath has
+more than one entry to a JAR containing the resource). If you use
+```id``` Spring will judge this as a *bean redefinition* instead of
+the definition of two separate beans. This can make a big difference!
+
+Try this:
+
+* Remove the ```id="load_script_code"``` from
+  ```resources/spring-config-load-script.xml``` and run this:
+
+* build the *uberjar*:
+
+		lein uberjar 
+
+* Run the driver app with
+  ```classpath\*:spring-config-load-script.xml``` (this tells Spring
+  to load **all occurences** of the named resource) and an *extended
+  classpath* (```:./resources/```). This way we have the **resource
+  ```spring-config-load-script.xml```** **twice** in our classpath:
+
+		java -cp target/spring-break-0.1.0-SNAPSHOT-standalone.jar:./resources/ \
+		clojure.main -m spring-break.core classpath\*:spring-config-load-script.xml 
+
+You should see the output of ```script-code.clj``` twice. Depending on
+what the code (i.e. the loaded Spring bean) does, it may make a
+difference. Now insert ```id="load_script_code"``` back in and re-run
+(don't forget ```lein uberjar```!). See?
+
+### Loading Clojure namespaces
+
+To load a namespace we can just ```require``` it:
+
+	  <bean id="load_namespace" 
+		class="clojure.lang.Compiler" 
+		factory-method="load">
+		<constructor-arg>
+		  <bean class="java.io.StringReader">
+	        <constructor-arg value="(require 'spring-break.the-code)" />
+		  </bean>
+		</constructor-arg>
+	  </bean>
+
+Run:
+
+	lein run spring-config-load-namespace.xml load_namespace
+
+Try the *multiple load example* from above. There **will be** two bean
+definition, but Clojure will *load* the namespace only once!
 
 ## More to come
 
