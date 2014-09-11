@@ -194,7 +194,7 @@ the definition of two separate beans. This can make a big difference!
 Try this:
 
 * Remove the ```id="load_script_code"``` from
-  ```resources/spring-config-load-script.xml``` and run this:
+  ```resources/spring-config-load-script.xml```
 
 * build the *uberjar*:
 
