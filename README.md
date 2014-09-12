@@ -30,12 +30,12 @@ code but only 36 in the Clojure code ;-)
 
 ### Clojure
 
-There is a simple driver app (```spring-break.core/-main```) which you
-can run via lein (see ```:main spring-break.core``` in
-```project.clj```) that will build a *Spring application context* from
-XML definitions files -- i.e. *resources* -- (first arg) and then
-retrieves Spring beans by their ```id``` (remaining args) from that
-and print those to stdout.
+You can run the driver app (```spring-break.core/-main```) via lein
+ (see ```:main spring-break.core``` in ```project.clj```). It will
+ build a *Spring application context* from XML definitions files --
+ i.e. *resources* -- (first arg) and then retrieve Spring beans by
+ their ```id``` (remaining args) from the application context and
+ print those to stdout.
 
 Try this:
 
@@ -72,7 +72,8 @@ This will give you the classpath for your project.
 
 ### Run without lein
 
-So you may run:
+You'll need the classpath if you want to run our code without
+lein. Try:
 
     CP=`lein classpath`
 	java -cp ${CP} clojure.main -m spring-break.core spring-config-empty.xml
@@ -82,6 +83,8 @@ your ```${CP}``` if you change the project dependencies (which will
 not be that often once you project has stablized).
 
 ### Working offline
+
+**This needs to be worked over**
 
 When you don't have an internet connection, you want to use
 
@@ -97,7 +100,7 @@ dependencies.
 Since I want to show how to integrate Clojure- and Java-based Spring
 beans, I need some Java code as well.  In
 ```./src/main/java/javastuff/Driver.java``` you'll find the *driver*
-from above implemented in Java.
+from above implemented in Java. We won't need it that much.
 
 Compile:
 
@@ -110,7 +113,8 @@ Run:
 
 ### Running with an uberjar
 
-Finally you can do:
+You can use lein to create an *uberjar* (aka *shaded jar*). Usually
+you do this when delivering your application to end users:
 
 	lein uberjar
 	java -cp target/spring-break-0.1.0-SNAPSHOT-standalone.jar javastuff.Driver spring-config-empty.xml
@@ -120,7 +124,8 @@ This builds an *uberjar* (which contains all JARs and resources in you
 project dependencies -- i.e. *classpath*) and then runs our Java-based
 driver and the Clojure-based driver.
 
-**TODO: show how to run the compiled Clojure code via -jar**
+**TODO: show how to use AOT and run the compiled Clojure code via
+  -jar**
 
 ## Defining Clojure-based Spring beans
 
