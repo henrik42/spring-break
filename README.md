@@ -180,9 +180,16 @@ Try this:
 
 	lein run spring-config-load-script.xml load_script_code
 
-You'll see that the Spring bean ```load_script_code``` has the value ```null```.
+You'll see that the Spring bean ```load_script_code``` has the value ```null``` --- that is the value of the last form that is
+evaluated. Try putting this into ```src/main/clojure/no-namespace-scripts/script-code.clj```
 
-**TODO: do this via classloader instead of plain file IO**
+	(printf "+++ loading script-code.clj in namespace '%s'\n" *ns*)
+	"foobar"
+
+and re-run.
+
+**TODO: do this via classloader instead of plain file IO, since that
+would work with uberjar as well**
 
 ### Use bean ids
 
