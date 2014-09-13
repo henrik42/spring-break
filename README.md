@@ -261,7 +261,10 @@ The nested ```<bean><constructor-arg><bean><constructor-arg>``` XML
 definition is a bit too clumsy. I would like to just use one
 non-nested structure.
 
-To be continued ...
+First let's define our first usefull spring Bean:
+
+
+	lein run spring-config-load-factories.xml compiler_load
 
 ## More to come
 
