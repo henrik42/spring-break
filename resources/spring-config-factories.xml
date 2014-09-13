@@ -4,9 +4,14 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans 
 			   http://www.springframework.org/schema/beans/spring-beans-3.0.xsd">
 
-  <bean id="a_clojure_bean" 
+  <bean id="clojure_fact" 
+	abstract="true"
 	factory-bean="clojure_factory"
 	factory-method="new_instance">
+  </bean>
+
+  <bean id="a_clojure_bean" 
+	parent="clojure_fact">
     <constructor-arg 
 	value=":it-works" />
   </bean>

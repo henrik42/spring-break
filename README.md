@@ -307,6 +307,23 @@ method)
 		value=":it-works" />
 	  </bean>
 
+There is one more tweak: I wanted to DRY out the XML definition a
+little more, so I defined a *abstract parent*. Now all the
+Clojure-based beans just have to name their ```id```, ```parent``` and
+their *code*.
+
+	  <bean id="clojure_fact" 
+		abstract="true"
+		factory-bean="clojure_factory"
+		factory-method="new_instance">
+	  </bean>
+
+	  <bean id="a_clojure_bean" 
+		parent="clojure_fact">
+		<constructor-arg 
+		value=":it-works" />
+	  </bean>
+
 I set up an XML file for this. So you may try:
 
 	lein run spring-config-factories.xml a_clojure_bean
