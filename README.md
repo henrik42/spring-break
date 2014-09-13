@@ -25,8 +25,8 @@ try to give *plain Java examples* as well. Finally I'll show how to
 ## Driver 
 
 We'll need a *driver* app to run our code. We have one in Clojure and
-one in Java (just to notice that there are 38 parentheses in the Java
-code but only 36 in the Clojure code ;-)
+one in Java (just to notice that there are 38 braces in the Java code
+but only 36 in the Clojure code ;-)
 
 ### Clojure
 
@@ -193,7 +193,7 @@ would work with uberjar as well**
 
 ### Use bean ids
 
-You should get into the habbit of using ```id``` attributes to name
+You should get into the habit of using ```id``` attributes to name
 your spring beans. If you don't, you may run into situations where you
 have more than one Spring **bean** defined.
 
@@ -254,6 +254,14 @@ defintion as well --- i.e. you can feed more than one form to
 ```clojure.lang.Compiler/load```:
 
 	<constructor-arg value="(require 'spring-break.the-code) :foobar" />
+
+### Create a Clojure-based Spring bean that creates Spring beans
+
+The nested ```<bean><constructor-arg><bean><constructor-arg>``` XML
+definition is a bit too clumsy. I would like to just use one
+non-nested structure.
+
+To be continued ...
 
 ## More to come
 
