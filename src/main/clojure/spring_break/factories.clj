@@ -4,16 +4,11 @@
   (clojure.lang.Compiler/load
    (java.io.StringReader. s)))
 
-(defprotocol object_factory
-  (new_instance [this s]))
+(defprotocol object-factory
+  (new-instance [this s]))
 
 (def clojure-object-factory
-  (reify object_factory
-    (new_instance [this s]
+  (reify object-factory
+    (new-instance [this s]
       (compiler-load s))))
 
-;;(deftype clojure-object-factory []
-;;  object-factory
-;;  (new-instance [s]
-;;    (compiler-load s)))
-  

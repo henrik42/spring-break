@@ -261,10 +261,55 @@ The nested ```<bean><constructor-arg><bean><constructor-arg>``` XML
 definition is a bit too clumsy. I would like to just use one
 non-nested structure.
 
-First let's define our first usefull spring Bean:
+So let's define our first usefull Spring Bean. The bean will be
+whatever we put into ```spring-break.factories/clojure-object-factory```
+	
+	  <bean id="clojure_factory" 
+		class="clojure.lang.Compiler" 
+		factory-method="load">
+		<constructor-arg>
+		  <bean class="java.io.StringReader">
+			  <constructor-arg 
+				  value="(require 'spring-break.factories) 
+			      spring-break.factories/clojure-object-factory" />
+		  </bean>
+		</constructor-arg>
+	  </bean>
 
+In ```src/main/clojure/spring_break/factories.clj``` I put
 
-	lein run spring-config-load-factories.xml compiler_load
+* the factory function
+
+		(defn compiler-load [s]
+		  (clojure.lang.Compiler/load
+		   (java.io.StringReader. s)))
+
+* a *protocol* so that we have a **named method** that we can tell
+  Spring to call
+
+		(defprotocol object-factory
+		  (new-instance [this s]))
+
+* and an object of the protocol type which will be our Spring bean
+
+		(def clojure-object-factory
+		  (reify object-factory
+			(new-instance [this s]
+			  (compiler-load s))))
+
+Now we can do this (note that we have to use the *Java-name* of the
+method)
+
+	  <bean id="a_clojure_bean" 
+		factory-bean="clojure_factory"
+		factory-method="new_instance">
+		<constructor-arg 
+		value=":it-works" />
+	  </bean>
+
+I set up an XML file for this. So you may try:
+
+	lein run spring-config-factories.xml a_clojure_bean
 
 ## More to come
 
