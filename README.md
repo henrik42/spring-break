@@ -251,7 +251,7 @@ Since ```require``` always returns ```nil``` you will see ```null```
 regardless of what is in the namespace. But still the last evaluated
 form gets returned. And of course you can put it into the XML
 defintion as well --- i.e. you can feed more than one form to
-```clojure.lang.Compiler/load```:
+ ```clojure.lang.Compiler/load```:
 
 	<constructor-arg value="(require 'spring-break.the-code) :foobar" />
 
