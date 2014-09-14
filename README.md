@@ -243,6 +243,13 @@ difference. Now insert ```id="load_script_code"``` back in and re-run
 		  </bean>
 		</constructor-arg>
 	  </bean>
+	
+	  <bean id="load_script_code" 
+		class="clojure.lang.Compiler" 
+		factory-method="loadFile">
+		<constructor-arg 
+		value="src/main/clojure/no-namespace-scripts/script-code-with-function.clj" />
+	  </bean>
 
 Note that I put ```depends-on="load_script_code"``` in the bean
 definition. This way we tell spring that *this* bean needs another
