@@ -1,6 +1,4 @@
-# spring-break
-
-A Clojure library for Clojure/Spring integration.
+This is a Clojure library for Clojure/Spring integration.
 
 It is not really a library because there is not that much code. I'll
 show how to define Spring beans in Clojure in a way that enables you
@@ -22,13 +20,13 @@ try to give *plain Java examples* as well. Finally I'll show how to
 *deploy* the code into a Java-based Spring application (the
 *integration case*).
 
-## Driver 
+# Driver 
 
 We'll need a *driver* app to run our code. We have one in Clojure and
 one in Java (just to notice that there are 38 braces in the Java code
 but only 36 in the Clojure code ;-)
 
-### Clojure
+## Clojure
 
 You can run the driver app (```spring-break.core/-main```) via lein
  (see ```:main spring-break.core``` in ```project.clj```). It will
@@ -48,7 +46,7 @@ This run doesn't do much. It is just there to ensure that everything
 is set up right. We'll load Clojure-based Spring beans in just a
 minute.
 
-### Resolving project dependencies
+## Resolving project dependencies
 
 The first time you run the example above, leiningen will download all
 the required JARs to ```./local-m2/``` (see ```:dependencies``` in
@@ -62,7 +60,7 @@ You can use
 
 to just resolve dependencies and to update your repository.
 
-### The project's classpath
+## The project's classpath
 
 Run this:
 
@@ -70,7 +68,7 @@ Run this:
 
 This will give you the classpath for your project.
 
-### Run without lein
+## Run without lein
 
 You'll need the classpath if you want to run our code without
 lein. Try:
@@ -82,7 +80,7 @@ This will save you the start-up time of lein but you have to update
 your ```${CP}``` if you change the project dependencies (which will
 not be that often once you project has stablized).
 
-### Working offline
+## Working offline
 
 **This needs to be worked over**
 
@@ -95,7 +93,7 @@ When you don't have an internet connection, you want to use
 In this case leiningen will not try to check and download any
 dependencies.
 
-### Java
+## Java
 
 Since I want to show how to integrate Clojure- and Java-based Spring
 beans, I need some Java code as well.  In
@@ -111,7 +109,7 @@ Run:
     CP=`lein classpath`
 	java -cp ${CP} javastuff.Driver spring-config-empty.xml
 
-### Running with an uberjar
+## Running with an uberjar
 
 You can use lein to create an *uberjar* (aka *shaded jar*). Usually
 you do this when delivering your application to end users:
@@ -127,7 +125,7 @@ driver and the Clojure-based driver.
 **TODO: show how to use AOT and run the compiled Clojure code via
   -jar**
 
-## Defining Clojure-based Spring beans
+# Defining Clojure-based Spring beans
 
 Spring has several built-in instantiation strategies for beans. One of
 them lets you name a ```class```, an (instance) ```factory-method```
@@ -135,7 +133,7 @@ and any number of ```constructor-arg``` which again may be Spring
 beans (nested ```bean``` element or referenced by ```ref``` attribute)
 or of any of the built-in value types (e.g. ```String```).
 
-### hello world!
+## hello world!
 
 So we may do this:
 
@@ -153,7 +151,7 @@ Run:
 
 	lein run spring-config-hello-world.xml hello_world
 
-### Loading Clojure script files
+## Loading Clojure script files
 
 You can load Clojure script files via ```clojure.lang.Compiler/loadFile```:
 
@@ -191,7 +189,7 @@ and re-run.
 **TODO: do this via classloader instead of plain file IO, since that
 would work with uberjar as well**
 
-### Use bean ids
+## Use bean ids
 
 You should get into the habit of using ```id``` attributes to name
 your spring beans. If you don't, you may run into situations where you
@@ -226,7 +224,48 @@ what the code (i.e. the loaded Spring bean) does, it may make a
 difference. Now insert ```id="load_script_code"``` back in and re-run
 (don't forget ```lein uberjar```!). See?
 
-### Loading Clojure namespaces
+## Depending on side effects
+
+ In ```resources/spring-config-load-script-with-sideeffect.xml``` I
+ put a second bean definition that calls the function ```foo/foobar```
+ which gets ```def```ined in
+ ```src/main/clojure/no-namespace-scripts/script-code-with-function.clj```. Note
+ that we have to explicitly name the namespace ```foo``` because
+ *this* code is ```eval```uated in namespace ```user```.
+
+	  <bean id="foobar" 
+		class="clojure.lang.Compiler" 
+		depends-on="load_script_code"
+		factory-method="load">
+			<constructor-arg>
+				<bean class="java.io.StringReader">
+			<constructor-arg value='(foo/foobar "bar")' />
+		  </bean>
+		</constructor-arg>
+	  </bean>
+
+Note that I put ```depends-on="load_script_code"``` in the bean
+definition. This way we tell spring that *this* bean needs another
+bean to be instanciated before itself can be instanciated. In this
+simple example we could have *fixed* the problem by just reverting the
+order of the bean definitions. But using ```depends-on``` will work
+even in complex bean definition set-ups.
+
+And here's the Clojure code for reference. Note that we have to
+```(use clojure.core)``` so that we don't need to namespace-qualify
+the following symbols.
+
+	(in-ns 'foo)
+	(clojure.core/use 'clojure.core)
+	(defn foobar [& args]
+	  (printf "+++ Calling (%s/foobar %s)\n" *ns* args)
+	  (vec args))
+
+Run the example:
+
+	lein run spring-config-load-script-with-sideeffect.xml foobar
+
+## Loading Clojure namespaces
 
 To load a namespace we can just ```require``` it:
 
@@ -255,7 +294,7 @@ to ```clojure.lang.Compiler/load``` --- like this:
 
 	<constructor-arg value="(require 'spring-break.the-code) :foobar" />
 
-### Create a Clojure-based Spring bean that creates Spring beans
+## Create a Clojure-based Spring bean that creates Spring beans
 
 The nested ```<bean><constructor-arg><bean><constructor-arg>``` XML
 definition is a bit too clumsy. I would like to just use one
@@ -328,6 +367,6 @@ I set up an XML file for this. So you may try:
 
 	lein run spring-config-factories.xml a_clojure_bean
 
-## More to come
+# More to come
 
 OK, this is it for today. 
