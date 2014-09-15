@@ -397,6 +397,31 @@ that call (e.g. if the port is already in use).
 
 	lein run spring-config-swank.xml
 
+## Start nrepl
+
+Starting an nrepl server is just as easy:
+
+	  <import resource="spring-config-factories.xml" />
+	  <bean id="run_nrepl" 
+		parent="clojure_fact">
+		<constructor-arg 
+		value='
+			   (ns user
+				 (:require [clojure.tools.nrepl.server]))
+			   (println "+++ Starting nrepl server ...")
+			   (def server (clojure.tools.nrepl.server/start-server :port 7888))
+			   (println "+++ nrepl server started.")
+			   ' />
+	  </bean>
+
+And run like this:
+
+	lein run spring-config-nrepl.xml
+
+To connect to this nrepl server use:
+
+	lein repl :connect 7888
+
 ## Beware of comments
 
 Note that this won't work:
