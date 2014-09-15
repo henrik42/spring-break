@@ -8,12 +8,13 @@
   <bean id="run_swank" 
 	parent="clojure_fact">
     <constructor-arg 
-	value="
-	       (in-ns 'user)
-	       (use 'swank.swank)
+	value='
+	       (ns user
+	         (:use swank.swank))
+	       (println "+++ Starting swank server")
 	       (future 
 	           (start-server :port 4007))
-	       " />
+	       ' />
   </bean>
 
 </beans>

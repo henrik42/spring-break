@@ -374,18 +374,19 @@ I set up an XML file for this. So you may try:
 
 ## Start Swank
 
-As a special side-effect you can start swank:
+As a *special* side-effect you can start swank:
 
 	  <import resource="spring-config-factories.xml" />
 	  <bean id="run_swank" 
 		parent="clojure_fact">
 		<constructor-arg 
-		value="
-			   (in-ns 'user)
-			   (use 'swank.swank)
+		value='
+			   (ns user
+				 (:use swank.swank))
+			   (println "+++ Starting swank server")
 			   (future 
-			       (start-server :port 4007))
-			   " />
+				   (start-server :port 4007))
+			   ' />
 	  </bean>
 
 Here we re-use the ```clojure_fact``` Spring bean from above and start
@@ -396,9 +397,28 @@ that call (e.g. if the port is already in use).
 
 	lein run spring-config-swank.xml
 
-## Start nrepl server
+## Beware of comments
 
-**TODO: how to start the server? How to connect?**
+Note that this won't work:
+
+	  <import resource="spring-config-factories.xml" />
+	  <bean id="run_swank" 
+		parent="clojure_fact">
+		<constructor-arg 
+		value='
+			   (ns user
+				 (:use swank.swank))
+			   (println "+++ Starting swank server")
+			   ;; Start swank
+			   (future 
+				   (start-server :port 4007))
+			   ' />
+	  </bean>
+
+The XML text content will be given to the ```Compiler/load``` function
+as a **one line String with no line-breaks**. So the comment will
+comment out everything after the ```;; Start swank```. Use ```#_```
+and ```(comment)``` instead.
 
 # More to come
 

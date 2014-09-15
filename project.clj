@@ -3,6 +3,7 @@
   :description "A Clojure library for Clojure/Spring integration."
   :url "http://example.com/FIXME"
   :dependencies [[org.clojure/clojure "1.5.1"]
+                 [swank-clojure "1.4.3"]
                  [org.springframework/spring-core ~springframework-version]
                  [org.springframework/spring-context ~springframework-version]
                  [org.springframework/spring-beans ~springframework-version]]
