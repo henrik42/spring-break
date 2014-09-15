@@ -252,20 +252,18 @@ difference. Now insert ```id="load_script_code"``` back in and re-run
 	  </bean>
 
 Note that I put ```depends-on="load_script_code"``` in the bean
-definition. This way we tell spring that *this* bean needs another
+definition. This way we tell Spring that *this* bean needs another
 bean to be instanciated before itself can be instanciated. In this
 simple example we could have *fixed* the problem by just reverting the
 order of the bean definitions. But using ```depends-on``` will work
 even in complex bean definition set-ups.
 
-And here's the Clojure code for reference. Note that we have to
-```(use clojure.core)``` so that we don't need to namespace-qualify
-the following symbols.
+And here's the Clojure code for reference.
 
-	(in-ns 'foo)
-	(clojure.core/use 'clojure.core)
+	(printf "+++ loading %s in namespace '%s'\n" *file* *ns*)
+	(ns foo)
 	(defn foobar [& args]
-	  (printf "+++ Calling (%s/foobar %s)\n" *ns* args)
+	  (printf "+++ Calling (%s %s)\n" foobar args)
 	  (vec args))
 
 Run the example:
