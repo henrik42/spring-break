@@ -171,7 +171,7 @@ namespace but a *plain script*.** (I use dashes here - so this cannot
 be namespaces!)
 
 Loading a script file will usually not create any instances that you
-use as Spring beans. **You load this script for it's side effects**
+use as Spring beans. **You load this script for it's side-effects**
 (i.e. *defines* or just the output in this simple example).
 
 Try this:
@@ -224,7 +224,7 @@ what the code (i.e. the loaded Spring bean) does, it may make a
 difference. Now insert ```id="load_script_code"``` back in and re-run
 (don't forget ```lein uberjar```!). See?
 
-## Depending on side effects
+## Depending on side-effects
 
  In ```resources/spring-config-load-script-with-sideeffect.xml``` I
  put a second bean definition that calls the function ```foo/foobar```
@@ -371,6 +371,34 @@ their *code*.
 I set up an XML file for this. So you may try:
 
 	lein run spring-config-factories.xml a_clojure_bean
+
+## Start Swank
+
+As a special side-effect you can start swank:
+
+	  <import resource="spring-config-factories.xml" />
+	  <bean id="run_swank" 
+		parent="clojure_fact">
+		<constructor-arg 
+		value="
+			   (in-ns 'user)
+			   (use 'swank.swank)
+			   (future 
+			       (start-server :port 4007))
+			   " />
+	  </bean>
+
+Here we re-use the ```clojure_fact``` Spring bean from above and start
+the swank server. We use a ```future``` to do this in a separate
+thread so that we will not slow down the *boot* of the Spring
+application context and to drop any exception that may come out of
+that call (e.g. if the port is already in use).
+
+	lein run spring-config-swank.xml
+
+## Start nrepl server
+
+**TODO: how to start the server? How to connect?**
 
 # More to come
 
