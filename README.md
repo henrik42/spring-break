@@ -445,6 +445,70 @@ as a **one line String with no line-breaks**. So the comment will
 comment out everything after the ```;; Start swank```. Use ```#_```
 and ```(comment)``` instead.
 
+# Wrapping Spring beans
+
+One of the use-cases of the Clojure/Spring integration is to wrap
+Java-based Spring beans with your Clojure code (*proxying*). Since
+this use-case is not limited to Clojure but is omni-present in Spring
+AOP, there exists some Spring classes to support this.
+
+For the following examples I will use some Java classes as a
+placeholder for the *Java-based application* and then show how to wire
+the Clojure code into that.
+
+## Proxying
+
+Assume that you have a Java-based Spring bean:
+
+	<bean id="some_bean" class="javastuff.AppCode$SomeBusinessImpl" />
+
+Now you can *wrap* the bean with your code:
+
+	  <bean id="my_interceptor" 
+		parent="clojure_fact">
+		<constructor-arg value="(require 'spring-break.proxying) 
+								spring-break.proxying/my-interceptor" />
+	  </bean>
+
+The easiest way to do this is with a ```BeanNameAutoProxyCreator```:
+
+	  <bean id="creator" 
+		class="org.springframework.aop.framework.autoproxy.BeanNameAutoProxyCreator">
+		<property name="beanNames" value="some_bean"/>
+		<property name="interceptorNames">
+		  <list>
+		<value>my_interceptor</value>
+		  </list>
+		</property>
+	  </bean>
+
+And run:
+
+	lein run spring-config-use-proxy-factory-bean.xml some_bean my_interceptor
+	
+Spring has a lot more ways of applying code/beans to other code/beans - see the Spring documentation for details.
+
+**TODO: to be continued**
+
+# Replacing Spring beans
+
+**TODO: usecase: replace a Java-based Spring bean with you Clojure-based one**
+
+# Defining Spring integration beans
+
+The Spring IoC container lets you define your beans and wire them
+(which we haven't done yet). But Spring also lets you *inject* your
+own code into the Spring infrastructure. This way your code can
+participate in the lifycycle of the Spring application context.
+
+One way to inject your code is via Spring beans (of course!). Spring
+will inspect all beans (i.e. bean definitions) of the application
+context and will *detect* those beans that can participate in the
+lifecycle. Once those beans are identified they will be instanciated
+and their *call-back* methods will be called by Spring.
+
+**TODO: to be continued**
+
 # More to come
 
 OK, this is it for today. 
