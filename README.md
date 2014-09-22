@@ -167,12 +167,12 @@ Now run this:
 
 You'll see the output of ```script-code.clj```. Notice that
 evalutation starts in namespace ```user```. We are **not loading a
-namespace but a *plain script*.** (I use dashes here - so this cannot
-be namespaces!)
+namespace but a *plain script*.** (I use dashes here in the directory
+name - so this cannot be a namespace!)
 
 Loading a script file will usually not create any instances that you
-use as Spring beans. **You load this script for it's side-effects**
-(i.e. *defines* or just the output in this simple example).
+use as Spring beans. **You load this script for its side-effects**
+(i.e. *defines* or just the output to stdout in this simple example).
 
 Try this:
 
@@ -198,8 +198,9 @@ have more than one Spring **bean** defined.
 This happens when using ```classpath*:``` and Spring finds your Spring
 bean definition files more than one time (e.g. when your classpath has
 more than one entry to a JAR containing the resource). If you use
-```id``` Spring will judge this as a *bean redefinition* instead of
-the definition of two separate beans. This can make a big difference!
+```id``` Spring will judge this case as a *bean redefinition* instead
+of the definition of two separate beans. This can make a big
+difference!
 
 Try this:
 
@@ -456,13 +457,15 @@ For the following examples I will use some Java classes as a
 placeholder for the *Java-based application* and then show how to wire
 the Clojure code into that.
 
-## Proxying
-
-Assume that you have a Java-based Spring bean:
+Assume that you have a Java-based Spring bean ```some_bean``` which is
+used by a second Java-based bean ```some_bean_user```. This is **the**
+standard case for Java-based applications since that is what most
+people use Spring for: *wiring Java instances*.
 
 	<bean id="some_bean" class="javastuff.AppCode$SomeBusinessImpl" />
 
-Now you can *wrap* the bean with your code:
+And you have some Clojure code that you want to *wrap around* ```some_bean```.
+We put that into bean ```my_interceptor```.
 
 	  <bean id="my_interceptor" 
 		parent="clojure_fact">
@@ -477,7 +480,7 @@ The easiest way to do this is with a ```BeanNameAutoProxyCreator```:
 		<property name="beanNames" value="some_bean"/>
 		<property name="interceptorNames">
 		  <list>
-		<value>my_interceptor</value>
+			  <value>my_interceptor</value>
 		  </list>
 		</property>
 	  </bean>
@@ -486,7 +489,9 @@ And run:
 
 	lein run spring-config-use-proxy-factory-bean.xml some_bean my_interceptor
 	
-Spring has a lot more ways of applying code/beans to other code/beans - see the Spring documentation for details.
+Spring has a lot more ways of specifying how to apply some code/beans
+to some other code/beans (e.g. by type, annotation, regular
+expressions, etc) --- see the Spring AOP documentation for details.
 
 **TODO: to be continued**
 
