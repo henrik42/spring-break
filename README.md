@@ -458,11 +458,15 @@ placeholder for the *Java-based application* and then show how to wire
 the Clojure code into that.
 
 Assume that you have a Java-based Spring bean ```some_bean``` which is
-used by a second Java-based bean ```some_bean_user```. This is **the**
-standard case for Java-based applications since that is what most
-people use Spring for: *wiring Java instances*.
+used by (and injected into) a second Java-based bean ```some_bean_user```.
+This is **the** standard case for Java-based
+applications since that is what most people use Spring for: *wiring
+Java instances*.
 
-	<bean id="some_bean" class="javastuff.AppCode$SomeBusinessImpl" />
+	  <bean id="some_bean" class="javastuff.AppCode$SomeBusinessImpl" />
+	  <bean id="some_bean_user" class="javastuff.AppCode$SomeBusinessImpl">
+		<property name="other" ref="some_bean" />
+	  </bean>
 
 And you have some Clojure code that you want to *wrap around* ```some_bean```.
 We put that into bean ```my_interceptor```.
@@ -472,6 +476,27 @@ We put that into bean ```my_interceptor```.
 		<constructor-arg value="(require 'spring-break.proxying) 
 								spring-break.proxying/my-interceptor" />
 	  </bean>
+
+Here's the code for reference:
+
+	(def my-interceptor
+	  (proxy [org.aopalliance.intercept.MethodInterceptor][]
+		(invoke [invctn]
+		  (let [m (.getMethod invctn)
+				t (.getThis invctn)
+				a (vec (.getArguments invctn))
+				_ (printf "+++ Calling method %s on %s with %s\n" m t a)
+				res (try 
+					  {:res (.proceed invctn)}
+					  (catch Throwable t {:ex t}))]
+			(printf "+++ DONE: Calling method %s on %s with %s %s\n"
+					m t a
+					(if-let [r (:res res)]
+							 (format "returns '%s'" r)
+							 (format "fails due to %s" (:ex res))))
+			(if-let [r (:res res)]
+			  r
+			  (throw (:ex res)))))))
 
 The easiest way to do this is with a ```BeanNameAutoProxyCreator```:
 
@@ -487,13 +512,15 @@ The easiest way to do this is with a ```BeanNameAutoProxyCreator```:
 
 And run:
 
-	lein run spring-config-use-proxy-factory-bean.xml some_bean my_interceptor
+	lein run spring-config-use-proxy-factory-bean.xml some_bean
 	
 Spring has a lot more ways of specifying how to apply some code/beans
 to some other code/beans (e.g. by type, annotation, regular
 expressions, etc) --- see the Spring AOP documentation for details.
 
-**TODO: to be continued**
+# Using CGLIB
+
+**TODO: apply proxying without using an interface.**
 
 # Replacing Spring beans
 

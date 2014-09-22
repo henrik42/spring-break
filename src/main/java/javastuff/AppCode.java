@@ -3,20 +3,34 @@ package javastuff;
 public class AppCode {
 
 	public interface SomeBusinessInterface {
-		String someMethod();
+		String someMethod(String pOther);
 	}
 
 	public static class SomeBusinessImpl implements SomeBusinessInterface {
 
-		private SomeBusinessImpl m_other;
+		private SomeBusinessInterface m_other;
 
-		public void setOther(SomeBusinessImpl pOther) {
+		public void setOther(SomeBusinessInterface pOther) {
+			// String msg = "*** Calling setOther(" + pOther + ") on " + this;
+			// System.out.println(msg);
 			m_other = pOther;
+			m_other.someMethod("foo");
 		}
 
 		@Override
-		public String someMethod() {
-			return "My name is : " + super.toString();
+		public String someMethod(String pArg) {
+			String msg = "*** Calling someMethod(" + pArg + ") on " + this;
+			// System.out.println(msg);
+			return msg;
+		}
+
+		@Override
+		public String toString() {
+			String thisString = "[" + super.toString() + "] m_other = '"
+					+ m_other + "'";
+			// String msg = "*** Calling toString() on " + thisString;
+			// System.out.println(msg);
+			return thisString;
 		}
 	}
 

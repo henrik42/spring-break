@@ -23,5 +23,8 @@
   </bean>
 
   <bean id="some_bean" class="javastuff.AppCode$SomeBusinessImpl" />
+  <bean id="some_bean_user" class="javastuff.AppCode$SomeBusinessImpl">
+    <property name="other" ref="some_bean" />
+  </bean>
 
 </beans>
