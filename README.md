@@ -512,7 +512,7 @@ The easiest way to do this is with a ```BeanNameAutoProxyCreator```:
 
 And run:
 
-	lein run spring-config-use-proxy-factory-bean.xml some_bean
+	lein run spring-config-with-BeanNameAutoProxyCreator.xml some_bean
 
 In this example we implemented an *around advice* --- i.e. we supplied
 code that runs before the proxied code and after the proxied
