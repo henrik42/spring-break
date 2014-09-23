@@ -451,17 +451,17 @@ and ```(comment)``` instead.
 One of the use-cases of the Clojure/Spring integration is to wrap
 Java-based Spring beans with your Clojure code (*proxying*). Since
 this use-case is not limited to Clojure but is omni-present in Spring
-AOP, there exists some Spring classes to support this.
+AOP, there exist some Spring classes to support this.
 
 For the following examples I will use some Java classes as a
 placeholder for the *Java-based application* and then show how to wire
 the Clojure code into that.
 
 Assume that you have a Java-based Spring bean ```some_bean``` which is
-used by (and injected into) a second Java-based bean ```some_bean_user```.
-This is **the** standard case for Java-based
-applications since that is what most people use Spring for: *wiring
-Java instances*.
+used by (and injected into) a second Java-based bean ```some_bean_user```
+(both being of class ```javastuff.AppCode$SomeBusinessImpl```).  This is **the** standard
+case for Java-based applications since that is what most people use
+Spring for: *wiring Java instances*.
 
 	  <bean id="some_bean" class="javastuff.AppCode$SomeBusinessImpl" />
 	  <bean id="some_bean_user" class="javastuff.AppCode$SomeBusinessImpl">
@@ -513,10 +513,28 @@ The easiest way to do this is with a ```BeanNameAutoProxyCreator```:
 And run:
 
 	lein run spring-config-use-proxy-factory-bean.xml some_bean
-	
+
+In this example we implemented an *around advice* --- i.e. we supplied
+code that runs before the proxied code and after the proxied
+code. This is the most general case of *wrapping*. We could have
+decided to not delegate to the proxied code at all, effectively
+replacing the code/bean. Or we could have done something with the
+parameters/aguments (i.e. changed/replaced) before passing them to the
+proxied code or we could have changed the returned value or mapped the
+exception in case one was thrown or whatever.
+
 Spring has a lot more ways of specifying how to apply some code/beans
 to some other code/beans (e.g. by type, annotation, regular
 expressions, etc) --- see the Spring AOP documentation for details.
+
+## Beware of endless recursion/cyclic references
+
+There are times when your *proxying code* **introduces** cyclic paths
+into the object references graph.
+
+**Idee: toString() Implementierungen, die über den Proxy gehen und
+damit Zyklen erzeugen, die aber nur durch den Proxy und seine Ausgabe
+von Parametern entstehen. Lösung: thread-local binding**
 
 # Using CGLIB
 
