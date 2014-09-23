@@ -533,7 +533,36 @@ expressions, etc) --- see the Spring AOP documentation for details.
 
 # Replacing Spring beans
 
-**TODO: usecase: replace a Java-based Spring bean with you Clojure-based one**
+We can effectively replace a Java-based Spring bean via *proxying*
+(see above) but there is a much simpler way: just **redefine** the
+bean. *Redefining* a bean just means: defining a bean with the id of
+the bean you want to redefine (target bean) **after** the target bean
+has been defined.
+
+One way to control this *order* is to use an ```import```. 
+
+	  <bean id="some_bean_user" class="javastuff.AppCode$SomeBusinessImpl">
+		<property name="other" ref="some_bean" />
+	  </bean>
+	  <bean id="some_bean" class="javastuff.AppCode$SomeBusinessImpl" />
+	  <import resource="spring-config-redefine-some-bean.xml" />
+
+Here we ```import``` the redefinition of bean ```some_bean```:
+
+	  <bean id="some_bean" parent="clojure_fact">
+		<constructor-arg value='(proxy [javastuff.AppCode$SomeBusinessInterface][]
+					(someMethod [p]
+					(printf "+++ Calling someMethod(%s)\n" p)
+					"foo"))
+					' />
+
+Try running
+
+	lein run spring-config-with-redefine.xml some_bean
+
+and then comment out the ```import``` and re-run. Note that the output
+of the Java-based Spring bean is out-of-order compared to the output
+of the Clojure-based one (don't know why yet).
 
 # Defining Spring integration beans
 

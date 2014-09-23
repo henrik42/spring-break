@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+       xsi:schemaLocation="http://www.springframework.org/schema/beans 
+			   http://www.springframework.org/schema/beans/spring-beans-3.0.xsd">
+
+  <bean id="some_bean_user" class="javastuff.AppCode$SomeBusinessImpl">
+    <property name="other" ref="some_bean" />
+  </bean>
+  <bean id="some_bean" class="javastuff.AppCode$SomeBusinessImpl" />
+  <import resource="spring-config-redefine-some-bean.xml" />
+
+</beans>

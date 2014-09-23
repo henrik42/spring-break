@@ -20,7 +20,7 @@ public class AppCode {
 		@Override
 		public String someMethod(String pArg) {
 			String msg = "*** Calling someMethod(" + pArg + ") on " + this;
-			// System.out.println(msg);
+			System.out.println(msg);
 			return msg;
 		}
 
