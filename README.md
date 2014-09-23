@@ -527,15 +527,6 @@ Spring has a lot more ways of specifying how to apply some code/beans
 to some other code/beans (e.g. by type, annotation, regular
 expressions, etc) --- see the Spring AOP documentation for details.
 
-## Beware of endless recursion/cyclic references
-
-There are times when your *proxying code* **introduces** cyclic paths
-into the object references graph.
-
-**Idee: toString() Implementierungen, die über den Proxy gehen und
-damit Zyklen erzeugen, die aber nur durch den Proxy und seine Ausgabe
-von Parametern entstehen. Lösung: thread-local binding**
-
 # Using CGLIB
 
 **TODO: apply proxying without using an interface.**
