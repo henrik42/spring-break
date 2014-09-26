@@ -13,6 +13,6 @@
 	parent="clojure_fact">
     <constructor-arg value='(proxy [javastuff.AppCode$SomeCode][])' />
   </bean>
-  <bean id="some_bean" scope="singleton" class="javastuff.AppCode$SomeBusinessImpl" />
+  <bean id="some_bean" class="javastuff.AppCode$SomeBusinessImpl" />
  
 </beans>
