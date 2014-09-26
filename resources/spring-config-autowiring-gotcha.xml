@@ -11,9 +11,15 @@
   <import resource="spring-config-factories.xml" />
 
   <!-- fails! --><bean id="some_bean" class="javastuff.AppCode$SomeBusinessImpl" />
-  <!-- fix depend-on: bean id="some_bean" depends-on="an_auto_wire_candidate" class="javastuff.AppCode$SomeBusinessImpl" /-->
+  <!-- fix depends-on: bean id="some_bean" depends-on="an_auto_wire_candidate" class="javastuff.AppCode$SomeBusinessImpl" /-->
   <!-- fix prototype: bean id="some_bean" scope="prototype" class="javastuff.AppCode$SomeBusinessImpl" /-->
   <!-- fix lazy: bean id="some_bean" lazy-init="true" class="javastuff.AppCode$SomeBusinessImpl" /-->
+
+  <!-- fix pull in hook: bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer" 
+	id="pull_in_clojure_beans"
+	depends-on="an_auto_wire_candidate">
+    <property name="placeholderPrefix" value="$$$do-not-use$$$" />
+  </bean-->
 
   <bean id="an_auto_wire_candidate" 
 	parent="clojure_fact">

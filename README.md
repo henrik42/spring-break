@@ -624,8 +624,8 @@ to ```an_auto_wire_candidate``` won't help --- Spring will not interpret
 this as being the type of the bean.
 
 You can *fix* this by letting ```some_bean``` *depend on*
-```an_auto_wire_candidate``` (this is the most *natural* way of
-controlling bean instanciation order):
+```an_auto_wire_candidate``` (this is the most *natural* but also the
+most *invasive* way of controlling bean instanciation order):
 
 	<bean id="some_bean" depends-on="an_auto_wire_candidate" class="javastuff.AppCode$SomeBusinessImpl" />
 
@@ -639,16 +639,16 @@ Or you make it ```lazy-init```:
 
 	<bean id="some_bean" lazy-init="true" class="javastuff.AppCode$SomeBusinessImpl" />
 
-Both fixes introduce an ordering so that ```some_bean``` is created
-after ```an_auto_wire_candidate```.
-
-## Controlling bean instanciation ordering
+All of these fixes introduce an ordering so that ```some_bean``` is
+created after ```an_auto_wire_candidate```.
 
 If you want to autowire your Clojure beans into an existing Java-based
 Spring application it is usually no option to change the (existing)
 Spring bean definitions.
 
-Sometime you may be able to insert this into one of the files:
+Sometime you may be able to insert this into one of the bean
+definition files that get loaded early enough so that the beans that
+need those autowiring candidates come after that:
 
 	<import resource="classpath*:spring-config-clojure.xml" />
 
@@ -657,6 +657,33 @@ In this case Spring will try to load **all occurances** of
 it can't find any (```classpath*:```). This introduces the option of
 placing such a file where the classloader can pick it up just when you
 need it.
+
+But still this *solution* has the drawback of depending on an ordering
+that may be hard to control.
+
+The most elegant solution is this: we just use a *dummy* bean that is
+a ```org.springframework.beans.factory.config.BeanFactoryPostProcessor```
+and let that depend on our Clojure-based beans. We cannot supply such
+a bean via Clojure since Spring needs the class information for this
+(and again that will be available *too late*). I just use one of the
+Spring utility classes as a *no-op* just to have a hook that will
+pull-in the Clojure-based beans.
+
+	  <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer" 
+		id="pull_in_clojure_beans"
+		depends-on="an_auto_wire_candidate">
+		<property name="placeholderPrefix" value="$$$do-not-use$$$" />
+	  </bean>
+
+Usually the beans that use autowiring will be *normal business beans*
+that won't hook into the Spring application context lifecycle. So in
+most cases we do not have to worry about if our
+```BeanFactoryPostProcessor``` comes before any other
+```BeanFactoryPostProcessor``` that may carry ```@Autowired``` members
+that should receive our Clojure-based beans.
+
+If you run into such a situation please contact me and tell me how you
+got out of that :-)
 
 # Implementing Spring callback interfaces
 
