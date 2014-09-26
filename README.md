@@ -644,6 +644,22 @@ after ```an_auto_wire_candidate```.
 
 ## Controlling bean instanciation ordering
 
+If you want to autowire your Clojure beans into an existing Java-based
+Spring application it is usually no option to change the (existing)
+Spring bean definitions.
+
+Sometime you may be able to insert this into one of the files:
+
+	<import resource="classpath*:spring-config-clojure.xml" />
+
+In this case Spring will try to load **all occurances** of
+```spring-config-clojure.xml``` from the classpath but won't fail when
+it can't find any (```classpath*:```). This introduces the option of
+placing such a file where the classloader can pick it up just when you
+need it.
+
+# Implementing Spring callback interfaces
+
 **todo**
 
 # Defining Spring integration beans
