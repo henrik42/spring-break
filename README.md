@@ -586,7 +586,7 @@ The Java code may like this:
 		@org.springframework.beans.factory.annotation.Autowired
 		private SomeCode m_autoWired;
 
-And the Spring bean definition:
+And the Spring bean definition (```spring-config-autowiring.xml```)
 
 	  <context:annotation-config/>
 	  <import resource="spring-config-factories.xml" />
@@ -600,10 +600,39 @@ And run:
 
 	lein run spring-config-autowiring.xml some_bean
 
-## Autowiring gotcha
+## Autowiring gotcha --- beware of ordering
 
+Try changing the order of the bean definitions
+(```spring-config-autowiring-gotcha.xml```)
 
+	  <bean id="some_bean" class="javastuff.AppCode$SomeBusinessImpl" />
+	  <bean id="an_auto_wire_candidate" 
+		parent="clojure_fact">
+		<constructor-arg value='(proxy [javastuff.AppCode$SomeCode][])' />
+	  </bean>
 
+And run:
+
+	lein run spring-config-autowiring-gotcha.xml some_bean
+
+This will fail. When Spring tries to instanciate and autowire ```some_bean``` it
+has no class/type information for ```an_auto_wire_candidate``` because that
+bean is created by a factory
+and since it is a singleton and has not been created yet, Spring does
+not know about its type. Adding ```class="javastuff.AppCode.SomeCode"```
+to ```an_auto_wire_candidate``` won't help --- Spring will not interpret
+this as being the type of the bean.
+
+You can *fix* this by making ```some_bean``` a ```prototype```:
+
+	<bean id="some_bean" scope="prototype" class="javastuff.AppCode$SomeBusinessImpl" />
+
+Or you make it ```lazy-init```:
+
+	<bean id="some_bean" lazy-init="true" class="javastuff.AppCode$SomeBusinessImpl" />
+
+Both fixes introduce an ordering so that ```some_bean``` is created
+after ```an_auto_wire_candidate```.
 
 # Defining Spring integration beans
 
