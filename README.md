@@ -555,6 +555,7 @@ Here we ```import``` the redefinition of bean ```some_bean```:
 					(printf "+++ Calling someMethod(%s)\n" p)
 					"foo"))
 					' />
+	  </bean>
 
 Try running
 
@@ -563,6 +564,46 @@ Try running
 and then comment out the ```import``` and re-run. Note that the output
 of the Java-based Spring bean is out-of-order compared to the output
 of the Clojure-based one (don't know why yet).
+
+Of course the Clojure-based bean must implement any *client view*
+(i.e. all the classes and interfaces) through which the replaced bean
+may be accessed by its *users*. Sometimes this may be impossible
+(e.g. in case of ```final``` classes).
+
+# Autowiring
+
+Until now we have wired the Spring beans via nested ```property```
+elements within the ```bean``` definition elemnts. But some
+applications may use *autowiring*. In this case there will be
+annotations in the Java code which mark the
+injection/wiring-points. Spring will then search the application
+context to find *matching* beans and autowire them. You may supply
+explicit injection via ```property``` to override but that is
+optional.
+
+The Java code may like this:
+
+		@org.springframework.beans.factory.annotation.Autowired
+		private SomeCode m_autoWired;
+
+And the Spring bean definition:
+
+	  <context:annotation-config/>
+	  <import resource="spring-config-factories.xml" />
+	  <bean id="an_auto_wire_candidate" 
+		parent="clojure_fact">
+		<constructor-arg value='(proxy [javastuff.AppCode$SomeCode][])' />
+	  </bean>
+	  <bean id="some_bean" scope="singleton" class="javastuff.AppCode$SomeBusinessImpl" />
+
+And run:
+
+	lein run spring-config-autowiring.xml some_bean
+
+## Autowiring gotcha
+
+
+
 
 # Defining Spring integration beans
 
@@ -578,6 +619,10 @@ lifecycle. Once those beans are identified they will be instanciated
 and their *call-back* methods will be called by Spring.
 
 **TODO: to be continued**
+
+# JMX/MBeans
+
+**TODO**
 
 # More to come
 
