@@ -49,9 +49,9 @@ minute.
 ## Resolving project dependencies
 
 The first time you run the example above, leiningen will download all
-the required JARs to ```./local-m2/``` (see ```:dependencies``` in
-```project.clj```) so you'll need an internet connection. I put
-```:local-repo "local-m2"``` in there so that I can easily track what
+the required JARs to ```./local-m2/``` (see ```:dependencies``` 
+in ```project.clj```) so you'll need an internet connection. I
+put ```:local-repo "local-m2"``` in there so that I can easily track what
 JARs we need for the *integration case*.
 
 You can use
@@ -96,8 +96,8 @@ dependencies.
 ## Java
 
 Since I want to show how to integrate Clojure- and Java-based Spring
-beans, I need some Java code as well.  In
-```./src/main/java/javastuff/Driver.java``` you'll find the *driver*
+beans, I need some Java code as well.
+In ```./src/main/java/javastuff/Driver.java``` you'll find the *driver*
 from above implemented in Java. We won't need it that much.
 
 Compile:
@@ -197,8 +197,8 @@ have more than one Spring **bean** defined.
 
 This happens when using ```classpath*:``` and Spring finds your Spring
 bean definition files more than one time (e.g. when your classpath has
-more than one entry to a JAR containing the resource). If you use
-```id``` Spring will judge this case as a *bean redefinition* instead
+more than one entry to a JAR containing the resource). If you
+use ```id``` Spring will judge this case as a *bean redefinition* instead
 of the definition of two separate beans. This can make a big
 difference!
 
@@ -623,8 +623,8 @@ not know about its type. Adding ```class="javastuff.AppCode.SomeCode"```
 to ```an_auto_wire_candidate``` won't help --- Spring will not interpret
 this as being the type of the bean.
 
-You can *fix* this by letting ```some_bean``` *depend on*
-```an_auto_wire_candidate``` (this is the most *natural* but also the
+You can *fix* this by letting ```some_bean```
+*depend on* ```an_auto_wire_candidate``` (this is the most *natural* but also the
 most *invasive* way of controlling bean instanciation order):
 
 	<bean id="some_bean" depends-on="an_auto_wire_candidate" class="javastuff.AppCode$SomeBusinessImpl" />
@@ -652,8 +652,8 @@ need those autowiring candidates come after that:
 
 	<import resource="classpath*:spring-config-clojure.xml" />
 
-In this case Spring will try to load **all occurances** of
-```spring-config-clojure.xml``` from the classpath but won't fail when
+In this case Spring will try to load **all occurances**
+of ```spring-config-clojure.xml``` from the classpath but won't fail when
 it can't find any (```classpath*:```). This introduces the option of
 placing such a file where the classloader can pick it up just when you
 need it.
@@ -677,9 +677,9 @@ pull-in the Clojure-based beans.
 
 Usually the beans that use autowiring will be *normal business beans*
 that won't hook into the Spring application context lifecycle. So in
-most cases we do not have to worry about if our
-```BeanFactoryPostProcessor``` comes before any other
-```BeanFactoryPostProcessor``` that may carry ```@Autowired``` members
+most cases we do not have to worry about if
+our ```BeanFactoryPostProcessor``` comes before any
+other ```BeanFactoryPostProcessor``` that may carry ```@Autowired``` members
 that should receive our Clojure-based beans.
 
 If you run into such a situation please contact me and tell me how you
