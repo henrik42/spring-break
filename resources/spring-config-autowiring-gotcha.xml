@@ -9,9 +9,12 @@
 
   <context:annotation-config/>
   <import resource="spring-config-factories.xml" />
+
   <!-- fails! --><bean id="some_bean" class="javastuff.AppCode$SomeBusinessImpl" />
+  <!-- fix depend-on: bean id="some_bean" depends-on="an_auto_wire_candidate" class="javastuff.AppCode$SomeBusinessImpl" /-->
   <!-- fix prototype: bean id="some_bean" scope="prototype" class="javastuff.AppCode$SomeBusinessImpl" /-->
   <!-- fix lazy: bean id="some_bean" lazy-init="true" class="javastuff.AppCode$SomeBusinessImpl" /-->
+
   <bean id="an_auto_wire_candidate" 
 	parent="clojure_fact">
     <constructor-arg value='(proxy [javastuff.AppCode$SomeCode][])' />

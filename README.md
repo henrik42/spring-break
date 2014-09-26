@@ -623,7 +623,15 @@ not know about its type. Adding ```class="javastuff.AppCode.SomeCode"```
 to ```an_auto_wire_candidate``` won't help --- Spring will not interpret
 this as being the type of the bean.
 
-You can *fix* this by making ```some_bean``` a ```prototype```:
+You can *fix* this by letting ```some_bean``` *depend on*
+```an_auto_wire_candidate``` (this is the most *natural* way of
+controlling bean instanciation order):
+
+	<bean id="some_bean" depends-on="an_auto_wire_candidate" class="javastuff.AppCode$SomeBusinessImpl" />
+
+But there are other (more implicit) ways:
+
+Make ```some_bean``` a ```prototype```:
 
 	<bean id="some_bean" scope="prototype" class="javastuff.AppCode$SomeBusinessImpl" />
 
@@ -633,6 +641,10 @@ Or you make it ```lazy-init```:
 
 Both fixes introduce an ordering so that ```some_bean``` is created
 after ```an_auto_wire_candidate```.
+
+## Controlling bean instanciation ordering
+
+**todo**
 
 # Defining Spring integration beans
 
