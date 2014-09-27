@@ -204,8 +204,8 @@ difference!
 
 Try this:
 
-* Remove the ```id="load_script_code"``` from
-  ```resources/spring-config-load-script.xml```
+* Remove the ```id="load_script_code"```
+  from ```resources/spring-config-load-script.xml```
 
 * build the *uberjar*:
 
