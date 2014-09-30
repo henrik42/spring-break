@@ -811,8 +811,8 @@ participate in the lifycycle of the Spring application context.
 One way to inject your code is via Spring beans (of course!). Spring
 will inspect all beans (i.e. bean definitions) of the application
 context and will *detect* those beans that can participate in the
-lifecycle (like the
-```org.springframework.beans.factory.config.PropertyPlaceholderConfigurer```
+lifecycle (like 
+the ```org.springframework.beans.factory.config.PropertyPlaceholderConfigurer```
 above). Once those beans are identified they will be instanciated and
 their *call-back* methods will be called by Spring during **the
 appropriate lifecycle phase**.
