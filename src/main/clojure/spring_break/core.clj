@@ -2,6 +2,7 @@
 (defn -main [conf & bean-names]
   (let [_ (printf "+++ Loading ClassPathXmlApplicationContext from '%s'\n" conf)
         sac (org.springframework.context.support.ClassPathXmlApplicationContext. conf)]
+    ;;(.registerShutdownHook sac)
     (printf "+++ Getting beans %s\n" bean-names)
     (dorun
      (for [bean-id bean-names
@@ -10,4 +11,5 @@
                bean-id
                bean
                (when bean (.getClass bean)))))
-    (printf "+++ done\n")))
+    (printf "+++ done\n")
+    (.close sac)))

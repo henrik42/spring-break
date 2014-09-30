@@ -685,24 +685,165 @@ that should receive our Clojure-based beans.
 If you run into such a situation please contact me and tell me how you
 got out of that :-)
 
+# Bean lifycycle callbacks
+
+Spring beans have a *lifecycle*:
+
+* construction (optionally with parameters)
+
+* property setting
+
+* initialization
+
+* shutdown
+
+The implementation of these are not Spring-dependent --- i.e. there
+are no Spring-specific code bindings (classes, interfaces,
+annotations) if you're not using Spring annotations for autowiring.
+
+The following sections will show how Clojure-based Spring beans can
+participate in this lifecycle.
+
+## Construction
+
+Using parameters with construction via ```(.new-instance
+spring-break.factories/clojure-object-factory)``` is tricky and
+clumsy. I haven't come up with a good solution for that.
+
+Even doing this with Java-based beans is tricky, since in some cases
+you have to resolve arity ambiguities via ```index``` values in
+the ```constructor-arg``` elements.
+
+So we just won't use this and stick to *property settings*.
+
+You find the complete code 
+in ```src/main/clojure/spring_break/lifecycle.clj```:
+
+	lein spring-config-lifecycle.xml some_bean
+	
+## Property setting
+
+Spring uses *Java beans setter methods* to set bean properties. Before
+Spring 3.1 these methods had to be ```void``` (see [1] [2]).
+
+These examples will only work with Spring 3.1 and above, because I 
+use ```defprotocol``` to define the setter methods. I you want to use
+older Spring versions you would have to use AOT ([3]).
+
+	(defprotocol some-bean-java-bean
+	  (setFoo [this v])
+	  (setBar [this v]))
+
+Now we implement that:
+
+	(def some-bean
+	  (let [state (atom {})]
+		(reify
+		  some-bean-java-bean
+		  (toString [this] (str @state))
+		  (setFoo [this v]
+			(swap! state assoc :foo v)
+			(printf "+++ after setFoo : %s\n" this))
+		  (setBar [this v]
+			(swap! state assoc :bar v)
+			(printf "+++ after setBar : %s\n" this)))))
+
+**TODO**: For the boiler-plate code you should use a macro.
+
+[1] http://docs.spring.io/spring/docs/3.2.x/spring-framework-reference/html/new-in-3.1.html
+
+[2] https://jira.spring.io/browse/SPR-8079
+
+[3] http://stackoverflow.com/questions/10634189/spring-bean-initialization-clojure
+
+## Initialization/afterPropertiesSet
+
+Spring lets you define your own *init* methods but you may use the
+marker interface ```org.springframework.beans.factory.InitializingBean``` as well:
+
+	(def some-bean
+	  (let [state (atom {})]
+		(reify
+		  org.springframework.beans.factory.InitializingBean
+		  (toString [this] (str @state))
+		  (afterPropertiesSet [this] (printf "+++ afterPropertiesSet : %s\n" this)))))
+
+Note that in this case ```afterPropertiesSet``` **will be called** ---
+**you cannot turn it off in the XML bean definition file** 
+(using ```init-method="<method>"``` instead gives you that option but then you
+have to define a ```protocol``` for that).
+
+## Cleanup/destroy
+
+The cleanup is similar:
+
+	(def some-bean
+	  (let [state (atom {})]
+		(reify
+		  org.springframework.beans.factory.DisposableBean
+		  (toString [this] (str @state))
+		  (destroy [this] (printf "+++ destroy : %s\n" this)))))
+
+## Startup/shutdown
+
+Spring offers call-back methods for asynchronuous startup and
+shutdown. See the Spring documentation for details. I put in the code
+just for completeness:
+
+	(def some-bean
+	  (let [state (atom {})]
+		(reify
+		  org.springframework.context.SmartLifecycle
+		  (toString [this] (str @state))
+		  (getPhase [this] 0)
+		  (isAutoStartup [this] (printf "+++ isAutoStartup : %s\n" this) true)
+		  (isRunning [this] (printf "+++ isRunning : %s\n" this) true)
+		  (start [this] (printf "+++ start : %s\n" this))
+		  (stop [this runnable] (printf "+++ stop : %s\n" this) (.run runnable)))))
+
 # Implementing Spring callback interfaces
 
-**todo**
-
-# Defining Spring integration beans
-
 The Spring IoC container lets you define your beans and wire them
-(which we haven't done yet). But Spring also lets you *inject* your
-own code into the Spring infrastructure. This way your code can
+(like we have done above). But Spring also lets you *inject* your own
+code into the Spring infrastructure. This way your code can
 participate in the lifycycle of the Spring application context.
 
 One way to inject your code is via Spring beans (of course!). Spring
 will inspect all beans (i.e. bean definitions) of the application
 context and will *detect* those beans that can participate in the
-lifecycle. Once those beans are identified they will be instanciated
-and their *call-back* methods will be called by Spring.
+lifecycle (like the
+```org.springframework.beans.factory.config.PropertyPlaceholderConfigurer```
+above). Once those beans are identified they will be instanciated and
+their *call-back* methods will be called by Spring during **the
+appropriate lifecycle phase**.
 
-**TODO: to be continued**
+## Container awareness
+
+**TODO**
+
+As such, they are recommended for infrastructure beans that require
+programmatic access to the container.
+
+Spring dependency
+
+* ApplicationContextAware
+
+Other methods of the
+ApplicationContext provide access to file resources, publishing application events, and accessing a
+MessageSource.
+
+* BeanNameAware
+
+* ApplicationEventPublisherAware
+
+* NotificationPublisherAware
+
+## Application context lifecycle
+
+**TODO**
+
+* BeanPostProcessor
+
 
 # JMX/MBeans
 
