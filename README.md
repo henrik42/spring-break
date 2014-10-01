@@ -26,6 +26,8 @@ We'll need a *driver* app to run our code. We have one in Clojure and
 one in Java (just to notice that there are 38 braces in the Java code
 but only 36 in the Clojure code ;-)
 
+**TODO: count again!**
+
 ## Clojure
 
 You can run the driver app (```spring-break.core/-main```) via lein
@@ -479,6 +481,8 @@ We put that into bean ```my_interceptor```.
 
 Here's the code for reference:
 
+**TODO: unroll the InvocationTargetException before re-throwing**
+
 	(def my-interceptor
 	  (proxy [org.aopalliance.intercept.MethodInterceptor][]
 		(invoke [invctn]
@@ -685,7 +689,7 @@ that should receive our Clojure-based beans.
 If you run into such a situation please contact me and tell me how you
 got out of that :-)
 
-# Bean lifycycle callbacks
+# Bean lifycycle
 
 Spring beans have a *lifecycle*:
 
@@ -735,8 +739,9 @@ Spring 3.1 these methods had to be ```void``` (see [1] [2]).
 
 The examples will only work with Spring 3.1 and above, because I 
 use ```defprotocol``` to define the setter methods and those methods
-return ```Object```. In case you want to use older Spring versions you have
-to use AOT ([3]).
+return ```Object```. In case you want to use older Spring versions you
+have to use AOT ([3]) or the ```ApplicationContextAware``` alternative
+shown below.
 
 	(defprotocol some-bean-java-bean
 	  (setFoo [this v])
@@ -803,7 +808,7 @@ a ```protocol``` instead the invasive use of the Spring interface.
 
 ## Startup/shutdown
 
-Spring offers (Spring-specific) call-back interfaces/methods for
+Spring offers (Spring-specific) callback interfaces/methods for
 asynchronuous startup and shutdown. So your beans can participate in
 those phases of the lifecycle. See the Spring documentation for
 details. I put in the code just for completeness:
@@ -819,7 +824,7 @@ details. I put in the code just for completeness:
 		  (start [this] (printf "+++ start : %s\n" this))
 		  (stop [this runnable] (printf "+++ stop : %s\n" this) (.run runnable)))))
 
-### Using registerShutdownHook (not)
+### Using registerShutdownHook for shutdown (not)
 
 There is the option to hook the Spring shutdown into the JVM shutdown
 (see ```src/main/clojure/spring_break/core.clj```):
@@ -837,47 +842,82 @@ Instead I use ```(.close sac)```.
 
 # Implementing Spring callback interfaces
 
-The Spring IoC container lets you define your beans and wire them
-(like we have done above). But Spring also lets you *inject* your own
-code into the Spring infrastructure. This way your code can
-participate in the lifycycle of the Spring application context.
+The Spring IoC container lets you define your beans and wire them. But
+Spring also lets you *inject* your own code into the Spring
+infrastructure. This way your code can participate in the lifycycle of
+the Spring application context (beyond the lifecycle of each bean; see
+above).
 
 One way to inject your code is via Spring beans (of course!). Spring
-will inspect all beans (i.e. bean definitions) of the application
-context and will *detect* those beans that can participate in the
-lifecycle (like 
+will inspect all beans of the application context and will *detect*
+those beans that can participate in the lifecycle (like 
 the ```org.springframework.beans.factory.config.PropertyPlaceholderConfigurer```
-above). Once those beans are identified they will be instanciated and
-their *call-back* methods will be called by Spring during **the
-appropriate lifecycle phase**.
+above). Once those beans are identified their *callback* methods will
+be called by Spring during **the appropriate lifecycle phase**.
 
-## Container awareness
+## org.springframework.context.ApplicationContextAware
+
+Sometimes you need programatic access to other Spring beans/bean
+definitions. Spring will inject the application context into your bean
+if the bean implements ```ApplicationContextAware```. Here I use it as
+an alternative to *properties setting* (see above). This way we do not
+need to define a ```protocol```.
+
+In this bean definition we use a *closure* over the ```args```
+argument (the bean names we want to access) and then retrieve them
+from the Spring application context in ```afterPropertiesSet```:
+
+	  <bean id="some_bean" 
+		parent="clojure_fact">
+		<constructor-arg value="
+		  (require 'spring-break.application-context-aware) 
+		  (spring-break.application-context-aware/make-some-bean 
+			  :foo :a_bean 
+			  :bar :b_bean)" />
+	  </bean>
+
+Here's the (relevant part of the) Clojure code:
+
+	(defn consume-args [sac args]
+	  (reduce-kv #(assoc %1 %2 (.getBean sac (name %3)))
+				 {}
+				 (apply hash-map args)))
+			 
+	(defn make-some-bean [& args]
+	  (let [state (atom {})]
+		(reify
+		  org.springframework.context.ApplicationContextAware
+		  org.springframework.beans.factory.InitializingBean
+		  (toString [this] (str @state))
+		  (setApplicationContext [this v] 
+			(swap! state assoc :sac v))
+		  (afterPropertiesSet [this]
+			(swap! state merge (consume-args (:sac @state) args))))))
+
+You could put a lot more functionality into ```consume-args``` but
+this should do for now.
+
+Run like:
+
+	lein run spring-config-application-context-aware.xml some_bean
+
+## BeanNameAware
 
 **TODO**
 
-As such, they are recommended for infrastructure beans that require
-programmatic access to the container.
+## ApplicationEventPublisherAware
 
-Spring dependency
+**TODO**
 
-* ApplicationContextAware
+## NotificationPublisherAware
 
-Other methods of the
-ApplicationContext provide access to file resources, publishing application events, and accessing a
-MessageSource.
+**TODO**
 
-* BeanNameAware
-
-* ApplicationEventPublisherAware
-
-* NotificationPublisherAware
-
-## Application context lifecycle
+# Application context lifecycle
 
 **TODO**
 
 * BeanPostProcessor
-
 
 # JMX/MBeans
 
