@@ -697,38 +697,46 @@ Spring beans have a *lifecycle*:
 
 * shutdown
 
-The implementation of these are not Spring-dependent --- i.e. there
-are no Spring-specific code bindings (classes, interfaces,
-annotations) if you're not using Spring annotations for autowiring.
-
 The following sections will show how Clojure-based Spring beans can
 participate in this lifecycle.
 
-## Construction
+You find the complete code example
+in ```src/main/clojure/spring_break/lifecycle.clj```
+and ```resources/spring-config-lifecycle.xml```:
 
-Using parameters with construction via ```(.new-instance
-spring-break.factories/clojure-object-factory)``` is tricky and
-clumsy. I haven't come up with a good solution for that.
+	  <bean id="some_bean" 
+		parent="clojure_fact">
+		<constructor-arg value="(require 'spring-break.lifecycle) 
+					spring-break.lifecycle/some-bean" />
+		<property name="foo" value="FOO" /> 
+		<property name="bar" value="BAR" /> 
+	  </bean>
 
-Even doing this with Java-based beans is tricky, since in some cases
-you have to resolve arity ambiguities via ```index``` values in
-the ```constructor-arg``` elements.
-
-So we just won't use this and stick to *property settings*.
-
-You find the complete code 
-in ```src/main/clojure/spring_break/lifecycle.clj```:
+And run:
 
 	lein spring-config-lifecycle.xml some_bean
 	
+## Construction
+
+Using parameters with construction 
+via ```spring-break.factories/clojure-object-factory``` is tricky and
+clumsy. I haven't come up with a good solution for that.
+
+Even doing this with Java-based beans is tricky, since in some cases
+you have to resolve arity ambiguities via ```index``` attribute values
+in the ```constructor-arg``` elements.
+
+So we just won't use this and stick to *property settings*.
+
 ## Property setting
 
 Spring uses *Java beans setter methods* to set bean properties. Before
 Spring 3.1 these methods had to be ```void``` (see [1] [2]).
 
-These examples will only work with Spring 3.1 and above, because I 
-use ```defprotocol``` to define the setter methods. I you want to use
-older Spring versions you would have to use AOT ([3]).
+The examples will only work with Spring 3.1 and above, because I 
+use ```defprotocol``` to define the setter methods and those methods
+return ```Object```. In case you want to use older Spring versions you have
+to use AOT ([3]).
 
 	(defprotocol some-bean-java-bean
 	  (setFoo [this v])
@@ -748,7 +756,10 @@ Now we implement that:
 			(swap! state assoc :bar v)
 			(printf "+++ after setBar : %s\n" this)))))
 
-**TODO**: For the boiler-plate code you should use a macro.
+Note that there is nothing Spring-specific in this code (no Spring
+classes/interfaces).
+
+**TODO: For the boiler-plate code you should use a macro.**
 
 [1] http://docs.spring.io/spring/docs/3.2.x/spring-framework-reference/html/new-in-3.1.html
 
@@ -768,10 +779,13 @@ marker interface ```org.springframework.beans.factory.InitializingBean``` as wel
 		  (toString [this] (str @state))
 		  (afterPropertiesSet [this] (printf "+++ afterPropertiesSet : %s\n" this)))))
 
+Using the interfaces binds your code to Spring. You could 
+use ```init-method="<method>"``` instead but then you have to define 
+a ```protocol``` for that.
+
 Note that in this case ```afterPropertiesSet``` **will be called** ---
-**you cannot turn it off in the XML bean definition file** 
-(using ```init-method="<method>"``` instead gives you that option but then you
-have to define a ```protocol``` for that).
+**you cannot turn it off in the XML bean definition file**.
+Using ```init-method="<method>"``` instead gives you that option.
 
 ## Cleanup/destroy
 
@@ -784,11 +798,15 @@ The cleanup is similar:
 		  (toString [this] (str @state))
 		  (destroy [this] (printf "+++ destroy : %s\n" this)))))
 
+Again you could use ```destroy-method="<method>"``` and 
+a ```protocol``` instead the invasive use of the Spring interface.
+
 ## Startup/shutdown
 
-Spring offers call-back methods for asynchronuous startup and
-shutdown. See the Spring documentation for details. I put in the code
-just for completeness:
+Spring offers (Spring-specific) call-back interfaces/methods for
+asynchronuous startup and shutdown. So your beans can participate in
+those phases of the lifecycle. See the Spring documentation for
+details. I put in the code just for completeness:
 
 	(def some-bean
 	  (let [state (atom {})]
@@ -800,6 +818,22 @@ just for completeness:
 		  (isRunning [this] (printf "+++ isRunning : %s\n" this) true)
 		  (start [this] (printf "+++ start : %s\n" this))
 		  (stop [this runnable] (printf "+++ stop : %s\n" this) (.run runnable)))))
+
+### Using registerShutdownHook (not)
+
+There is the option to hook the Spring shutdown into the JVM shutdown
+(see ```src/main/clojure/spring_break/core.clj```):
+
+	  (let [sac (org.springframework.context.support.ClassPathXmlApplicationContext. conf)]
+		(.registerShutdownHook sac)
+		[...]
+
+But your code may not be executed completely because the JVM will give
+your code only a limited time for shutting down. So *shutting down
+Spring via ```(System/exit 1)``` and ```registerShutdownHook```* is no
+good idea.
+
+Instead I use ```(.close sac)```.
 
 # Implementing Spring callback interfaces
 

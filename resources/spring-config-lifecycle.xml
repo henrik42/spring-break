@@ -7,7 +7,8 @@
   <import resource="spring-config-factories.xml" />
   <bean id="some_bean" 
 	parent="clojure_fact">
-    <constructor-arg value="(require 'spring-break.lifecycle) spring-break.lifecycle/some-bean" />
+    <constructor-arg value="(require 'spring-break.lifecycle) 
+			    spring-break.lifecycle/some-bean" />
     <property name="foo" value="FOO" /> 
     <property name="bar" value="BAR" /> 
   </bean>
