@@ -901,6 +901,43 @@ Run like:
 
 	lein run spring-config-application-context-aware.xml some_bean
 
+## org.springframework.beans.factory.config.BeanPostProcessor
+
+If you define a Spring bean of 
+type ```org.springframework.beans.factory.config.BeanPostProcessor```
+Spring will call-back on this bean for every bean instance that is
+created.
+
+For example:
+
+	  <bean id="some_bean" 
+		parent="clojure_fact">
+		<constructor-arg value='
+		  (proxy [org.springframework.beans.factory.config.BeanPostProcessor][]
+			(postProcessAfterInitialization [o s]
+			  (printf "+++ postProcessAfterInitialization on [%s] named [%s]\n" o s))
+			(postProcessBeforeInitialization [o s]
+			  (printf "+++ postProcessBeforeInitialization on [%s] named [%s]\n" o s)))' />
+	  </bean>
+
+But again Spring will not detect (early enough) that this is
+a ```BeanPostProcessor``` because this bean is created by a factory method. We
+have to *pull it in early* by adding (see above):
+
+	  <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer" 
+		id="pull_in_clojure_beans"
+		depends-on="some_bean">
+		<property name="placeholderPrefix" value="$$$do-not-use$$$" />
+	  </bean>
+
+And run:
+
+	lein run spring-config-bean-post-processor.xml
+
+## org.springframework.beans.factory.BeanClassLoaderAware
+
+## org.springframework.context.EmbeddedValueResolverAware
+
 ## BeanNameAware
 
 **TODO**
@@ -914,6 +951,7 @@ Run like:
 **TODO**
 
 # Application context lifecycle
+
 
 **TODO**
 
