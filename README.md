@@ -855,7 +855,7 @@ the ```org.springframework.beans.factory.config.PropertyPlaceholderConfigurer```
 above). Once those beans are identified their *callback* methods will
 be called by Spring during **the appropriate lifecycle phase**.
 
-## org.springframework.context.ApplicationContextAware
+## ApplicationContextAware
 
 Sometimes you need programatic access to other Spring beans/bean
 definitions. Spring will inject the application context into your bean
@@ -901,7 +901,7 @@ Run like:
 
 	lein run spring-config-application-context-aware.xml some_bean
 
-## org.springframework.beans.factory.config.BeanPostProcessor
+## BeanPostProcessor
 
 If you define a Spring bean of 
 type ```org.springframework.beans.factory.config.BeanPostProcessor```
@@ -934,9 +934,9 @@ And run:
 
 	lein run spring-config-bean-post-processor.xml
 
-## org.springframework.beans.factory.BeanClassLoaderAware
+## BeanClassLoaderAware
 
-## org.springframework.context.EmbeddedValueResolverAware
+## EmbeddedValueResolverAware
 
 ## BeanNameAware
 
@@ -952,10 +952,7 @@ And run:
 
 # Application context lifecycle
 
-
 **TODO**
-
-* BeanPostProcessor
 
 # JMX/MBeans
 
