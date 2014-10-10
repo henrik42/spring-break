@@ -51,7 +51,8 @@
 (defn mbean-info-assembler [pred]
   (proxy [org.springframework.jmx.export.assembler.AutodetectCapableMBeanInfoAssembler][]
     (includeBean [bean-class bean-name]
-      (let [incl? (pred bean-class bean-name)]
+      ;; bean-class will be java.lang.Object for factory-generated beans
+      (let [incl? (pred bean-name)]
         (.println System/out (format "+++ includeBean class=[%s] id=[%s] RETURNS %s" bean-class bean-name incl?))
         incl?))
     (getMBeanInfo [bean-obj bean-name]
