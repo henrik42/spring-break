@@ -13,7 +13,8 @@
 	<constructor-arg value='
         (proxy [org.springframework.jmx.export.naming.ObjectNamingStrategy][]
 	  (getObjectName [bean-obj bean-key]
-	    (javax.management.ObjectName. (format "clojure-beans:name=%s" bean-key))))
+	    (javax.management.ObjectName. 
+	      (format "clojure-beans:name=%s" bean-key))))
         ' />
       </bean>
     </property>

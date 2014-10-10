@@ -523,7 +523,7 @@ code that runs before the proxied code and after the proxied
 code. This is the most general case of *wrapping*. We could have
 decided to not delegate to the proxied code at all, effectively
 replacing the code/bean. Or we could have done something with the
-parameters/aguments (i.e. changed/replaced) before passing them to the
+parameters/arguments (i.e. changed/replaced) before passing them to the
 proxied code or we could have changed the returned value or mapped the
 exception in case one was thrown or whatever.
 
@@ -577,7 +577,7 @@ may be accessed by its *users*. Sometimes this may be impossible
 # Autowiring
 
 Until now we have wired the Spring beans via nested ```property```
-elements within the ```bean``` definition elemnts. But some
+elements within the ```bean``` definition elements. But some
 applications may use *autowiring*. In this case there will be
 annotations in the Java code which mark the
 injection/wiring-points. Spring will then search the application
@@ -585,7 +585,7 @@ context to find *matching* beans and autowire them. You may supply
 explicit injection via ```property``` to override but that is
 optional.
 
-The Java code may like this:
+The Java code may look like this:
 
 		@org.springframework.beans.factory.annotation.Autowired
 		private SomeCode m_autoWired;
@@ -804,7 +804,7 @@ The cleanup is similar:
 		  (destroy [this] (printf "+++ destroy : %s\n" this)))))
 
 Again you could use ```destroy-method="<method>"``` and 
-a ```protocol``` instead the invasive use of the Spring interface.
+a ```protocol``` instead of the invasive use of the Spring interface.
 
 ## Startup/shutdown
 
@@ -956,7 +956,35 @@ And run:
 
 # JMX/MBeans
 
-**TODO**
+Spring lets you register any bean with a JMX MBeanServer (see the
+Spring documentation for details). Here I want to show how to register
+Clojure functions as JMX operations.
+
+	<bean id="exporter" class="org.springframework.jmx.export.MBeanExporter">
+	  <property name="namingStrategy">
+	    <bean parent="clojure_fact">
+		  <constructor-arg value='
+		    (proxy [org.springframework.jmx.export.naming.ObjectNamingStrategy][]
+			  (getObjectName [bean-obj bean-key]
+			    (javax.management.ObjectName. 
+				  (format "clojure-beans:name=%s" bean-key))))
+	      ' />
+	    </bean>
+	  </property>
+
+	  <property name="assembler">
+	    <bean parent="clojure_fact">
+		  <constructor-arg value='
+		    (require (symbol "spring-break.jmx"))
+			  (spring-break.jmx/mbean-info-assembler 
+			    #(not (nil? (re-matches #"clj_.*" %))))
+	      ' />
+		</bean>
+	  </property>
+	</bean>
+
+
+	lein run spring-config-jmx.xml some_bean
 
 # More to come
 
