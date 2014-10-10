@@ -48,9 +48,6 @@
   <import resource="spring-config-factories.xml" />
   <bean id="exporter" class="org.springframework.jmx.export.MBeanExporter">
 
-    <!--property name="autodetect" value="true" /-->
-    <!--property name="autodetectModeName" value="AUTODETECT_ASSEMBLER" /-->
-
     <property name="namingStrategy" ref="namingStrategy" />
 
     <property name="assembler">
@@ -72,26 +69,16 @@
 	class="org.springframework.jmx.export.naming.KeyNamingStrategy">
     <property name="mappings">
       <props>
-	<prop key="bar">bean:name=bar</prop>
+	<prop key="echo">bean:name=echo</prop>
       </props>
     </property>
-    <!--property name="mappingLocations">
-      <value>names1.properties,names2.properties</value>
-    </property-->
   </bean>
 
-  <bean id="bar" parent="clojure_fact">
+  <bean id="echo" parent="clojure_fact">
     <constructor-arg value="
     (require 'spring-break.jmx)
-    spring-break.jmx/bar-bean
+    (spring-break.jmx/fn-wrapper-of (fn [a] a))
     " />
   </bean>
 
-  <bean id="barx" class="java.lang.String">
-    <constructor-arg value="fox" />
-  </bean>
-
-  <bean id="fox" class="java.lang.String">
-    <constructor-arg value="FOX" />
-  </bean>
 </beans>
