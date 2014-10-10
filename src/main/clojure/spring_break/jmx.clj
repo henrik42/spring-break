@@ -3,10 +3,12 @@
 ;; Evaluation kann man via #=() erreichen.
 (defn fn-wrapper-of [a-fn]
   (proxy [java.text.Format][]
+    (toString [] (format "(fn-wrapper-of %s meta=%s)" a-fn (meta a-fn)))
     (parseObject [a-str]
-      (let [arg (read-string (format "[%s]" a-str))
-            _ (.println System/out (format "+++ Calling (%s %s)"
-                                           a-fn a-str))
+      (let [fmt "+++ Calling (%s [meta=%s] %s)"
+            arg (read-string (format "[%s]" a-str))
+            _ (.println System/out (format fmt 
+                                           a-fn (meta a-fn) a-str))
             res (try
                   (apply a-fn arg)
                   (catch Exception x
@@ -14,13 +16,13 @@
                     ;; deserializable at remote JMX client sites
                     ;; (e.g. Clojure ArityExceptions wouldn't usually be)
                     ;; TODO: recure down the cause chain and convert those too
-                    (.println System/out (format "+++ Calling (%s %s) FAILS [%s]"
-                                                 a-fn a-str x))
+                    (.println System/out (format (str fmt " FAILS [%s]")
+                                                 a-fn (meta a-fn) a-str x))
                     (throw (doto (RuntimeException. (str x))
                              (.setStackTrace (.getStackTrace x))))))
             res-str (str res)]
-        (.println System/out (format "+++ Calling (%s %s) RETURNS [%s]"
-                                     a-fn a-str res-str))
+        (.println System/out (format (str fmt " RETURNS [%s]")
+                                     a-fn (meta a-fn) a-str res-str))
         res-str))))
 
 (defn make-mbean-parameter-info []

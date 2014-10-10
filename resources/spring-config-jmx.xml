@@ -34,14 +34,14 @@
   <bean id="clj_echo" parent="clojure_fact">
     <constructor-arg value="
     (require 'spring-break.jmx)
-    (spring-break.jmx/fn-wrapper-of (fn [a] a))
+    (spring-break.jmx/fn-wrapper-of ^{:info :echo} (fn [a] a))
     " />
   </bean>
 
   <bean id="clj_swap" parent="clojure_fact">
     <constructor-arg value="
     (require 'spring-break.jmx)
-    (spring-break.jmx/fn-wrapper-of (fn [a b] [b a]))
+    (spring-break.jmx/fn-wrapper-of ^{:info :swap} (fn [a b] [b a]))
     " />
   </bean>
 
