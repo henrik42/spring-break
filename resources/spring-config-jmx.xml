@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+       xsi:schemaLocation="http://www.springframework.org/schema/beans 
+			   http://www.springframework.org/schema/beans/spring-beans-3.0.xsd">
+
+  <!--
+      Ziel: man will Clojure Artefakte als MXBean verwenden. 
+
+      Vorgehen: man definiert einen MBeanExporter und injiziert einen
+      assembler als Callback. Dieser Callback wird für alle Beans
+      gefragt, ob diese Bean als MXBean verwendet werden soll. 
+      Man definiert also für die Sachen, die man konkret als MXBean
+      will, eine Bean. Diese Bean liefert nun ein Artefakt, das der 
+      Assmber "versteht" und weiß, was er zu MBeanInfo zu liefern hat.
+
+      Die Clojure-basierten Beans dürfen aber ausschließlich die eingebauten
+      Java-Typen verwenden (sowohl für die Parameter als auch für die 
+      Rückgabewerte). Frage: könnte man das so machen, dass der Assember eine
+      "passende Sicht" auf die eigentliche Bean erzeugt? Er würde also die 
+      Bean inspizieren um festzustellen, welche Parameter-Typen verwendet werden
+      und würde dann eine String basierte Sicht darauf erzeugen. Idee: dafür
+      kann man den reader verwenden. Und print erzeugt für die Clojure-Typen 
+      eine Sicht, die via reader wieder konsumiert werden kann. Aber das klappt
+      nur für die "eingebauten" Typen.
+
+      Der Assembler ist in Clojure impl. Er kann folgende Dinge verstehen:
+
+      a) eine Funktion: diese wird als JMX Operation veröffentlicht. Die Funktion
+         muss mit meta Informationen ausgestattet sein. Welche Parameter gibt es?
+	 Von welchem Typ sind diese? Das kann man über Type-Hints machen(?)
+
+      b) ein ref-typ (z.B. atom): wird als JMX Attribut veröffentlicht. Man 
+         kann den Wert lesen und setzen.
+
+      c) ein Symbol 'my.ns/foo - falls daran eine Funktion oder ein Ref-Typ
+         gebunden ist, wird dieser veröffentlicht.
+
+      d) ein Symbol 'my.ns - es werden alle gebundenen Vars gesucht und dann
+         werden diese veröffentlicht.
+
+      e) eine Seq - die Elemente werden wie oben beschrieben veröffentlicht
+
+      f) eine Map - dito
+
+      g) durch eine Multi-Funktion können weitere Typen "verstanden" werden.
+  -->
+  <import resource="spring-config-factories.xml" />
+  <bean id="exporter" class="org.springframework.jmx.export.MBeanExporter">
+
+    <!--property name="autodetect" value="true" /-->
+    <!--property name="autodetectModeName" value="AUTODETECT_ASSEMBLER" /-->
+
+    <property name="namingStrategy" ref="namingStrategy" />
+
+    <property name="assembler">
+      <bean parent="clojure_fact">
+	<constructor-arg value="(require 'spring-break.jmx)
+				(spring-break.jmx/mbean-info-assembler)" />
+      </bean>
+    </property>
+  </bean>
+
+  <!--
+      Übel. Wir haben zwar eine generische Klasse/Bean, die uns jene Beans sucht, die
+      als MXBean verwendet werden sollen und diese kann auch das JM Interface liefern,
+      aber wir brauchen noch eine explizit Liste von Mappings auf die Namen, die diese
+      MXBeans zur Laufzeit haben sollen. Man muss also auch noch eine NamingStrategy 
+      bauen, die das dynamisch macht.
+  -->
+  <bean id="namingStrategy" 
+	class="org.springframework.jmx.export.naming.KeyNamingStrategy">
+    <property name="mappings">
+      <props>
+	<prop key="bar">bean:name=bar</prop>
+      </props>
+    </property>
+    <!--property name="mappingLocations">
+      <value>names1.properties,names2.properties</value>
+    </property-->
+  </bean>
+
+  <bean id="bar" parent="clojure_fact">
+    <constructor-arg value="
+    (require 'spring-break.jmx)
+    spring-break.jmx/bar-bean
+    " />
+  </bean>
+
+  <bean id="barx" class="java.lang.String">
+    <constructor-arg value="fox" />
+  </bean>
+
+  <bean id="fox" class="java.lang.String">
+    <constructor-arg value="FOX" />
+  </bean>
+</beans>
