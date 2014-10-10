@@ -8,7 +8,15 @@
 
   <bean id="exporter" class="org.springframework.jmx.export.MBeanExporter">
 
-    <property name="namingStrategy" ref="namingStrategy" />
+    <property name="namingStrategy">
+      <bean parent="clojure_fact">
+	<constructor-arg value='
+        (proxy [org.springframework.jmx.export.naming.ObjectNamingStrategy][]
+	  (getObjectName [bean-obj bean-key]
+	    (javax.management.ObjectName. (format "clojure-beans:name=%s" bean-key))))
+        ' />
+      </bean>
+    </property>
 
     <property name="assembler">
       <bean parent="clojure_fact">
@@ -18,16 +26,6 @@
 	  #(not (nil? (re-matches #"clj_.*" %))))
         ' />
       </bean>
-    </property>
-  </bean>
-
-  <bean id="namingStrategy" 
-	class="org.springframework.jmx.export.naming.KeyNamingStrategy">
-    <property name="mappings">
-      <props>
-	<prop key="clj_echo">bean:name=echo</prop>
-	<prop key="clj_swap">bean:name=swap</prop>
-      </props>
     </property>
   </bean>
 
