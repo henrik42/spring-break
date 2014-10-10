@@ -52,8 +52,11 @@
 
     <property name="assembler">
       <bean parent="clojure_fact">
-	<constructor-arg value="(require 'spring-break.jmx)
-				(spring-break.jmx/mbean-info-assembler)" />
+	<constructor-arg value="
+        (require 'spring-break.jmx)
+	(spring-break.jmx/mbean-info-assembler 
+	  (fn [bean-class bean-name]
+	    (= bean-name (str 'echo))))" />
       </bean>
     </property>
   </bean>

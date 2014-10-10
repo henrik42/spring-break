@@ -48,11 +48,12 @@
    (into-array [(make-model-mbean-operation-info)])
    (into-array javax.management.modelmbean.ModelMBeanNotificationInfo [])))
 
-(defn mbean-info-assembler []
+(defn mbean-info-assembler [pred]
   (proxy [org.springframework.jmx.export.assembler.AutodetectCapableMBeanInfoAssembler][]
     (includeBean [bean-class bean-name]
-      (.println System/out (format "INCLUDE? --> [%s] bean-name = [%s]" bean-class bean-name))
-      (= bean-name "echo"))
+      (let [incl? (pred bean-class bean-name)]
+        (.println System/out (format "+++ includeBean class=[%s] id=[%s] RETURNS %s" bean-class bean-name incl?))
+        incl?))
     (getMBeanInfo [bean-obj bean-name]
-      (.println System/out (format "--> %s %s" bean-obj bean-name))
+      (.println System/out (format "+++ assembling bean=[%s] id=[%s]" bean-obj bean-name))
       (make-model-mbean-info bean-obj bean-name))))
