@@ -38,8 +38,7 @@
    (into-array [(make-mbean-parameter-info)])
    "java.lang.Object" ;; return type 
    javax.management.MBeanOperationInfo/ACTION_INFO
-   nil ;; Descriptor
-   ))
+   nil)) ;; descriptor
 
 (defn make-model-mbean-info [bean-obj bean-name]
   (javax.management.modelmbean.ModelMBeanInfoSupport.
