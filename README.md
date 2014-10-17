@@ -30,7 +30,7 @@ but only 36 in the Clojure code ;-)
 
 ## Clojure
 
-You can run the driver app (```spring-break.core/-main```) 
+You can run the *driver* (```spring-break.core/-main```) 
 via ```lein``` (see ```:main spring-break.core``` 
 in ```project.clj```). It will build a *Spring application context* from
 XML definitions files -- i.e. *resources* -- (first arg) and then
@@ -67,28 +67,31 @@ implementations. These classes will hook into the shutdown of the
 ```ServletContext``` shuts down.
 
 * **(active) tool-app:** In this case the tool's main thread will
-create the Spring application context, retrieve beans from it via
-```getBean()``` and use them for whatever the tool is supposed to
-do. So the main threads *drives* the business logic in this case. When
+create the Spring application context, retrieve beans from it
+via ```getBean()``` and use them for whatever the tool is supposed to
+do. So the main thread *drives* the business logic in this case. When
 the tool is done the tool's main thread calls ```close()``` and then
-exists. The ```close()``` call may be put in a ```finally``` block so
+exists. The call to ```close()``` may be wrapped in a ```finally``` so
 that the shutdown is performed even in case of a non-handled
 exception.
 
 * **(passive) server-app:** In this case the server's main thread will
-only create (but **not use**) the Spring application context. Some of
-the beans will be made available to remote clients (through beans
-within the Spring application context itself -- not the *driver code*
--- e.g. RMI, HTTP, JMX). So in this case the business logic is driven
-by calling clients. The shutdown must then be initiated through a
-client call to a bean that eventually calls ```close()```. The
-server's main thread just **waits** for the Spring application context
-having shut down. Note that the ```close()``` may or may not be
-executed concurrently to the client's calling thread depending on your
-implementation. The thread that initiates the ```close()``` (either
-synchronuously or concurrently) must not use any of the **closing**
-Spring application context's functionality after having initiated the
-```close()```.
+only create (but **not use**) the Spring application
+context. Typically some of the beans will be made available to remote
+clients (through beans within the Spring application context itself --
+not the *driver code* -- e.g. RMI, HTTP, JMX). So in this case the
+business logic is driven by calling clients.
+
+  The shutdown must then be initiated *externally* --- e.g. by a
+  client call through a bean that eventually calls ```close()```. The
+  server's main thread just **waits** for the Spring application
+  context having shut down. Note that the ```close()``` may or may not
+  be executed concurrently to the client's calling thread depending on
+  your implementation (so the client may be waiting until the shutdown
+  has completed or not). The thread that initiates the ```close()```
+  (either synchronuously or concurrently) must not use any of the
+  **closing** Spring application context's functionality after having
+  initiated the ```close()```.
 
 * **Using registerShutdownHook for shutdown (not)**
 
@@ -102,11 +105,12 @@ Spring application context's functionality after having initiated the
 		[...]
 		
   By doing so one tries to have the Spring application context being
-  shutdown even if the JVM goes down to some other reason than
-  mentioned above (i.e. cases where you do not control the termination
-  of the JVM by your application code). You could even choose to **not
-  call ```close()``` at all** in your application code and just rely
-  on the shutdown-hook being called when the JVM goes down.
+  shutdown even if the JVM goes down for some other reason than
+  mentioned above (i.e. cases where you do not control/initiate the
+  termination of the JVM by your application code). You could even
+  choose to **not call ```close()``` at all** in your application code
+  and just rely on the shutdown-hook being called when the JVM goes
+  down.
 
   But in these cases your code may not be executed completely (or not
   at all) because the JVM will give your code only a limited amount of
@@ -114,29 +118,29 @@ Spring application context's functionality after having initiated the
   gracefull shutdown on ```registerShutdownHook``` and JVM
   shutdown. Instead I'm using a *controlled call to ```close()```*.
 
-The *driver app* I'm using for this project can be used as an *active
+The *driver* I'm using for this project can be used as an *active
 tool* as well as a *passive server* (or both at the same time).
 
 This is the relevant part of the *driver* code:
 
 	(defn -main [conf & bean-names]
 	  (let [closed (promise)
-			sac (proxy [org.springframework.context.support.ClassPathXmlApplicationContext]
-					   [conf]
-				  (close [] 
+			sac (proxy [org.springframework.context.support.ClassPathXmlApplicationContext][conf]
+				  (close []
 					(try
 					  (proxy-super close)
 					  (finally
 						(deliver closed :doesnt-matter)))))]
+		(log "Getting beans: [%s]" bean-names)
 		(dorun
 		 (for [bean-id bean-names
 			   :let [bean (.getBean sac bean-id)]]
-		   (printf "+++ bean '%s' = %s  (%s)\n"
-				   bean-id
-				   bean
-				   (when bean (.getClass bean)))))
+		   (log "bean '%s' = '%s'  (%s)"
+				bean-id
+				bean
+				(when bean (.getClass bean)))))
 		(if (System/getProperty "wait-for-sac-close")
-	      @(promise)
+		  @(promise)
 		  (.close sac))))
 
 * The driver has a *tool-app* part (within the ```(dorun)```).
@@ -145,17 +149,29 @@ This is the relevant part of the *driver* code:
   property ```wait-for-sac-close```)
 
 * When run as a *tool-app* the Spring application context gets shut
-  down via ```(.close sac)``` (not ```finally``` wrapped here).
+  down via the *driver's* ```(.close sac)``` (not ```finally```
+  wrapped here).
 
-* When run as a *server-app* the driver's main threads waits on a
+* When run as a *server-app* the *driver*'s main threads waits on a
   ```@(promise)``` (that's a lot easier than a ```wait``` for a
   ```notify``` which often leads to *missed wake-ups* if you not
   really know what you're doing). ```ClassPathXmlApplicationContext```
   has an empty method ```onClose()``` which derived classes are
-  supposed to override. But the ```close()``` implementation does not
-  wrap the call to ```onClose()``` in a ```finally``` so I rather
-  override ```close()```. In addition you could check via
+  supposed to override. But Spring's ```close()``` implementation does
+  not wrap the call to ```onClose()``` in a ```finally``` so I rather
+  override ```close()```. In addition you can check via
   ```isActive()``` if the shutdown has succeeded or not.
+
+You can run the *driver* as a *server-app* like this:
+
+	lein trampoline with-profile server-app run spring-config-empty.xml
+
+Note: I'm using ```(spring-break.core/log)``` instead of Clojure's
+print-functions because they use ```clojure.core/*out*``` which is a
+*buffering* wrapper around ```System/out```. We'll be using Clojure
+and Java stuff (Spring!) at the same time. So in order to see the
+Clojure-output in sync with the Java-output we shouldn't buffer either
+of them.
 
 ## Resolving project dependencies
 
