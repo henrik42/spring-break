@@ -1,24 +1,24 @@
 This is a Clojure library for Clojure/Spring integration.
 
-It is not really a library because there is not that much code. I'll
-show how to define Spring beans in Clojure in a way that enables you
-to use Clojure in a Java-based Spring application without touching
-either the Java code nor the Spring bean definitions.
+Well, it is not really a *library* because there is not that much
+code. I'll show how to define Spring beans in Clojure in a way that
+enables you to use Clojure in a Java-based Spring application without
+touching either the Java code nor the (existing) Spring bean
+definitions.
 
 For the examples below I assume that the Java-based Spring application
-uses XML bean definition files to define the Spring application
+uses **XML bean definition files** to define the Spring application
 context. If I find the time I will supply examples for other
 definition strategies (like via annotations) as well.
 
-For the usage examples below I'll use leiningen to run the code. You
-should be able to adopt the code and the examples to cases where you
-don't use leiningen (as it is the standard case for Java-based
-applications). Using leiningen makes some tasks a lot easier (like
-setting up the classpath, running tests, etc.) but it does hide
-details that you have to know about when you're not using it. So I'll
-try to give *plain Java examples* as well. Finally I'll show how to
-*deploy* the code into a Java-based Spring application (the
-*integration case*).
+I'll use *leiningen* to run the code. You should be able to adopt the
+code and the examples to cases where you don't use *leiningen* (as it
+is the standard case for Java-based applications). Using *leiningen*
+makes some tasks a lot easier (like setting up the classpath, running
+tests, etc.) but it does hide details that you have to know about when
+you're not using it. So I'll try to give *plain Java examples* as
+well. Finally I'll show how to *deploy* the code into a Java-based
+Spring application (the *integration case*).
 
 # Driver 
 
@@ -30,12 +30,12 @@ but only 36 in the Clojure code ;-)
 
 ## Clojure
 
-You can run the driver app (```spring-break.core/-main```) via lein
- (see ```:main spring-break.core``` in ```project.clj```). It will
- build a *Spring application context* from XML definitions files --
- i.e. *resources* -- (first arg) and then retrieve Spring beans by
- their ```id``` (remaining args) from the application context and
- print those to stdout.
+You can run the driver app (```spring-break.core/-main```) 
+via ```lein``` (see ```:main spring-break.core``` 
+in ```project.clj```). It will build a *Spring application context* from
+XML definitions files -- i.e. *resources* -- (first arg) and then
+retrieve Spring beans by their ```id``` (remaining optional args) from
+the application context and print those to stdout.
 
 Try this:
 
@@ -45,12 +45,121 @@ The XML definitions files will be loaded via classloader/classpath
 which is ```./resources/spring-config-empty.xml``` in this case.
 
 This run doesn't do much. It is just there to ensure that everything
-is set up right. We'll load Clojure-based Spring beans in just a
-minute.
+is set up right. We'll load Clojure-based Spring beans in just a <a
+ref="Defining Clojure-based Spring beans">minute</a>.
+
+## Gracefull shutdown
+
+When using Spring it's usually quite clear how to start the Spring
+based application but many wonder how to **shut it down correctly**.
+
+*Shutting down* a Spring application context means 
+that ```org.springframework.context.ConfigurableApplicationContext.close()```
+is called. Calling ```close()``` on a closed (or [con]currently
+closing) Spring context is a no-op.
+
+There are several ways the call to ```close()``` can be initiated:
+
+* **web-app:** In this case you're using one of the
+```org.springframework.web.context.WebApplicationContext```
+implementations. These classes will hook into the shutdown of the
+```ServletContext``` and call ```close()``` when the
+```ServletContext``` shuts down.
+
+* **(active) tool-app:** In this case the tool's main thread will
+create the Spring application context, retrieve beans from it via
+```getBean()``` and use them for whatever the tool is supposed to
+do. So the main threads *drives* the business logic in this case. When
+the tool is done the tool's main thread calls ```close()``` and then
+exists. The ```close()``` call may be put in a ```finally``` block so
+that the shutdown is performed even in case of a non-handled
+exception.
+
+* **(passive) server-app:** In this case the server's main thread will
+only create (but **not use**) the Spring application context. Some of
+the beans will be made available to remote clients (through beans
+within the Spring application context itself -- not the *driver code*
+-- e.g. RMI, HTTP, JMX). So in this case the business logic is driven
+by calling clients. The shutdown must then be initiated through a
+client call to a bean that eventually calls ```close()```. The
+server's main thread just **waits** for the Spring application context
+having shut down. Note that the ```close()``` may or may not be
+executed concurrently to the client's calling thread depending on your
+implementation. The thread that initiates the ```close()``` (either
+synchronuously or concurrently) must not use any of the **closing**
+Spring application context's functionality after having initiated the
+```close()```.
+
+* **Using registerShutdownHook for shutdown (not)**
+
+  There is the option to hook the Spring shutdown into the JVM
+  shutdown (see ```src/main/clojure/spring_break/core.clj```):
+
+	  (let [sac (proxy [org.springframework.context.support.ClassPathXmlApplicationContext]
+					   [conf]
+	           [...])]
+		(.registerShutdownHook sac)
+		[...]
+		
+  By doing so one tries to have the Spring application context being
+  shutdown even if the JVM goes down to some other reason than
+  mentioned above (i.e. cases where you do not control the termination
+  of the JVM by your application code). You could even choose to **not
+  call ```close()``` at all** in your application code and just rely
+  on the shutdown-hook being called when the JVM goes down.
+
+  But in these cases your code may not be executed completely (or not
+  at all) because the JVM will give your code only a limited amount of
+  time for completion. So IMHO it's not a good idea to **depend** the
+  gracefull shutdown on ```registerShutdownHook``` and JVM
+  shutdown. Instead I'm using a *controlled call to ```close()```*.
+
+The *driver app* I'm using for this project can be used as an *active
+tool* as well as a *passive server* (or both at the same time).
+
+This is the relevant part of the *driver* code:
+
+	(defn -main [conf & bean-names]
+	  (let [closed (promise)
+			sac (proxy [org.springframework.context.support.ClassPathXmlApplicationContext]
+					   [conf]
+				  (close [] 
+					(try
+					  (proxy-super close)
+					  (finally
+						(deliver closed :doesnt-matter)))))]
+		(dorun
+		 (for [bean-id bean-names
+			   :let [bean (.getBean sac bean-id)]]
+		   (printf "+++ bean '%s' = %s  (%s)\n"
+				   bean-id
+				   bean
+				   (when bean (.getClass bean)))))
+		(if (System/getProperty "wait-for-sac-close")
+	      @(promise)
+		  (.close sac))))
+
+* The driver has a *tool-app* part (within the ```(dorun)```).
+
+* The driver can be used as a *server-app* (by setting the system
+  property ```wait-for-sac-close```)
+
+* When run as a *tool-app* the Spring application context gets shut
+  down via ```(.close sac)``` (not ```finally``` wrapped here).
+
+* When run as a *server-app* the driver's main threads waits on a
+  ```@(promise)``` (that's a lot easier than a ```wait``` for a
+  ```notify``` which often leads to *missed wake-ups* if you not
+  really know what you're doing). ```ClassPathXmlApplicationContext```
+  has an empty method ```onClose()``` which derived classes are
+  supposed to override. But the ```close()``` implementation does not
+  wrap the call to ```onClose()``` in a ```finally``` so I rather
+  override ```close()```. In addition you could check via
+  ```isActive()``` if the shutdown has succeeded or not.
 
 ## Resolving project dependencies
 
-The first time you run the example above, leiningen will download all
+The first time you run the example above, *leiningen* will download all
 the required JARs to ```./local-m2/``` (see ```:dependencies``` 
 in ```project.clj```) so you'll need an internet connection. I
 put ```:local-repo "local-m2"``` in there so that I can easily track what
@@ -72,15 +181,16 @@ This will give you the classpath for your project.
 
 ## Run without lein
 
-You'll need the classpath if you want to run our code without
-lein. Try:
+You'll need your project's classpath if you want to run our code
+without ```lein```. Try:
 
     CP=`lein classpath`
 	java -cp ${CP} clojure.main -m spring-break.core spring-config-empty.xml
 
-This will save you the start-up time of lein but you have to update
-your ```${CP}``` if you change the project dependencies (which will
-not be that often once you project has stablized).
+This will save you the start-up time of ```lein``` (assuming that you
+execute the ```java``` call more than once) but you have to update
+your ```${CP}``` when you change the project dependencies (which will
+not be that often once your project has stablized).
 
 ## Working offline
 
@@ -92,7 +202,7 @@ When you don't have an internet connection, you want to use
 
 **TODO: introduce a profile *offline* for this**
 
-In this case leiningen will not try to check and download any
+In this case *leiningen* will not try to check and download any
 dependencies.
 
 ## Java
@@ -113,8 +223,9 @@ Run:
 
 ## Running with an uberjar
 
-You can use lein to create an *uberjar* (aka *shaded jar*). Usually
-you do this when delivering your application to end users:
+You can use ```lein``` to create an *uberjar* (aka *shaded
+jar*). Usually you do this when delivering your application to end
+users:
 
 	lein uberjar
 	java -cp target/spring-break-0.1.0-SNAPSHOT-standalone.jar javastuff.Driver spring-config-empty.xml
@@ -133,7 +244,7 @@ Spring has several built-in instantiation strategies for beans. One of
 them lets you name a ```class```, an (instance) ```factory-method```
 and any number of ```constructor-arg``` which again may be Spring
 beans (nested ```bean``` element or referenced by ```ref``` attribute)
-or of any of the built-in value types (e.g. ```String```).
+or of any of the built-in value types (e.g. ```java.lang.String```).
 
 ## hello world!
 
@@ -824,22 +935,6 @@ details. I put in the code just for completeness:
 		  (start [this] (printf "+++ start : %s\n" this))
 		  (stop [this runnable] (printf "+++ stop : %s\n" this) (.run runnable)))))
 
-### Using registerShutdownHook for shutdown (not)
-
-There is the option to hook the Spring shutdown into the JVM shutdown
-(see ```src/main/clojure/spring_break/core.clj```):
-
-	  (let [sac (org.springframework.context.support.ClassPathXmlApplicationContext. conf)]
-		(.registerShutdownHook sac)
-		[...]
-
-But your code may not be executed completely because the JVM will give
-your code only a limited time for shutting down. So *shutting down
-Spring via ```(System/exit 1)``` and ```registerShutdownHook```* is no
-good idea.
-
-Instead I use ```(.close sac)```.
-
 # Implementing Spring callback interfaces
 
 The Spring IoC container lets you define your beans and wire them. But
@@ -956,11 +1051,24 @@ And run:
 
 # JMX/MBeans
 
-Spring lets you register any bean with a JMX MBeanServer (see the
-Spring documentation for details). Here I want to show how to register
-Clojure functions as JMX operations.
+Spring lets you register any Spring bean with a JMX MBeanServer (see
+the Spring documentation for details). Here I want to show how to
+register **Clojure functions as JMX operations**. This lets you call
+any of those funtions via *jconsole* (or any other JMX client).
+
+The ```org.springframework.jmx.export.MBeanExporter``` will *drive*
+the registration/publishing. It iterates over all beans and calls-back
+on our Clojure-based ```mbean-info-assembler``` (nested Spring bean)
+which delivers the *JMX view of the published beans*
+(```javax.management.modelmbean.ModelMBeanInfoSupport```; see
+below). In this example we will publish any bean whose name matches
+```#"clj_.*"```. Each function will be published with an JMX
+```ObjectName``` of ```(format "clojure-beans:name=%s" bean-key)```
+(see ```namingStrategy```). This will show-up in *jconsole* as the
+MBean name.
 
 	<bean id="exporter" class="org.springframework.jmx.export.MBeanExporter">
+
 	  <property name="namingStrategy">
 	    <bean parent="clojure_fact">
 		  <constructor-arg value='
@@ -983,8 +1091,122 @@ Clojure functions as JMX operations.
 	  </property>
 	</bean>
 
+The ```mbean-info-assembler``` serves two purposes:
 
-	lein run spring-config-jmx.xml some_bean
+(1) It decides which beans will be *included*/published (via the
+passed-in ```pred```)
+
+(2) It delivers the *JMX view* of the *included bean*
+
+Here's the code: (more details below)
+
+	(defn mbean-info-assembler [pred]
+	  (proxy [org.springframework.jmx.export.assembler.AutodetectCapableMBeanInfoAssembler][]
+		(includeBean [bean-class bean-name]
+		  (let [incl? (pred bean-name)]
+			incl?))
+		(getMBeanInfo [bean-obj bean-name]
+		  (make-model-mbean-info bean-obj bean-name))))
+
+Now we can define the first *Clojure function JMX bean*:
+
+	  <bean id="clj_echo" parent="clojure_fact">
+		<constructor-arg value="
+		(require 'spring-break.jmx)
+		(spring-break.jmx/fn-wrapper-of (fn [a] a))
+		" />
+	  </bean>
+
+We have some function (```(fn [a] a)``` in this case)
+and create the *JMX view* via ```fn-wrapper-of```.
+
+**TODO: do this via auto-proxying**
+
+There are some things to note:
+
+(1) *jconsole* can handle ```java.lang.String``` typed method paramters
+and build the GUI so that you can enter those parameter values. It
+won't let you enter anything for ```java.lang.Object``` typed
+parameters.
+
+**TODO: what if we just claim that it a of type String even if it is
+  not?**
+
+(2) Since you may publish variadic functions, we may have to enter
+**multiple parameter values** and we **don't know in advance** how
+many that may be. That's something *jconsole* does not support (means:
+I haven't found out how to do it yet; of course *jonsole* supports
+entering more than one parameter value, but this number has to be
+fixed at JMX registration time).
+
+So I'm using a *wrapper method* with just one ```java.lang.String```
+parameter. The *String input* is then parsed via ```(read-string
+(format "[%s]" string-input))```. So you can enter **multiple forms**
+in the *jconsole* GUI text field which will be wrapped in a ```vector```.
+
+Your function then gets called via ```(apply <your-fn> <parsed-input>)```.
+
+Note that I'm using ```read-string``` so **the user may call arbitrary
+code via ```#=(<code>)``` reader macro** before your function is in
+control.
+
+(3) Your function's returned value will be deserialized over to a
+remote calling client. In order to prevent classloading problems the
+*wrapper method* will transform the returned value via ```(pr-str)```
+into a ```String```. If your function throws an ```Exception``` the
+*wrapper method* will create and throw a ```RuntimeException```
+instead and copy the original ```Exception```'s stacktrace into
+that. This way you lose the exception type but you still get the
+stacktrace.
+
+In the end a remote calling will either receive a
+```java.lang.String``` (as of ```(pr)```) or a ```RuntimeException```
+both of which can be deserialized in any case.
+
+**TODO: copy cause-chain**
+
+In order for JMX to be able to call the *wrapper method* it has to be
+a *named method* of the form ```<some-type> <method-name>(String)```.
+Since I wanted to get by without using AOT I
+looked for some JDK interface with such a signature and found
+```String parseObject(String)``` in ```java.text.Format```.
+
+That's why ```fn-wrapper-of``` returns a ```(proxy
+[java.text.Format])``` with ```parseObject``` being the *wrapper
+method* around your Clojure function. When you run *jconsole* you will
+see ```parseObject``` as the *operations* name in the GUI.
+
+**TODO: is there a way to display a different lable?**
+
+The relevant part of the code looks like this:
+
+	(defn fn-wrapper-of [a-fn]
+	  (proxy [java.text.Format][]
+		(parseObject [a-str]
+		  (let [arg (read-string (format "[%s]" a-str))
+				res (try
+					  (apply a-fn arg)
+					  (catch Exception x
+						(throw (doto (RuntimeException. (str x))
+								 (.setStackTrace (.getStackTrace x))))))
+				res-str (pr-str res)]
+			res-str))))
+
+Run the example. This time we have to tell the *driver* to not just
+exit but to wait until the Spring application context gets closed.
+
+	CP=$(JAVA_CMD=`which java` lein classpath)
+	java -cp ${CP} -Dwait-for-sac-close clojure.main -m spring-break.core spring-config-jmx.xml
+
+Start *jconsole* and go to the *MBeans* tab. You should see a
+```clojure-beans``` JMX domain and ```clj_echo``` (besides others). In
+the text field you may enter ```(+ 1 2)``` and submit via
+```parseObject```. The returned value should be ```(+ 1 2)``` (hence
+the name of this bean ;-) Now try ```#=(+ 1 2)```. This should give
+you ```3```.
+
+I put some more *Clojure function JMX beans* in there.
+
 
 # More to come
 

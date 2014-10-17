@@ -20,7 +20,7 @@
                                                  a-fn (meta a-fn) a-str x))
                     (throw (doto (RuntimeException. (str x))
                              (.setStackTrace (.getStackTrace x))))))
-            res-str (str res)]
+            res-str (pr-str res)]
         (.println System/out (format (str fmt " RETURNS [%s]")
                                      a-fn (meta a-fn) a-str res-str))
         res-str))))
@@ -29,7 +29,8 @@
   (javax.management.MBeanParameterInfo.
    "FORMS:"
    "java.lang.String"
-   "Enter as many clojure forms as there are parameters to the clojure function being exposed via JMX."))
+   (str "Enter as many clojure forms as there are parameters"
+        "to the clojure function being exposed via JMX.")))
 
 (defn make-model-mbean-operation-info []
   (javax.management.modelmbean.ModelMBeanOperationInfo.
