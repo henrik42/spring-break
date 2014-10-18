@@ -60,11 +60,11 @@ closing) Spring context is a no-op.
 
 There are several ways the call to ```close()``` can be initiated:
 
-* **web-app:** In this case you're using one of the
-```org.springframework.web.context.WebApplicationContext```
-implementations. These classes will hook into the shutdown of the
-```ServletContext``` and call ```close()``` when the
-```ServletContext``` shuts down.
+* **web-app:** In this case you're using one of 
+the ```org.springframework.web.context.WebApplicationContext```
+implementations. These classes will hook into the shutdown of 
+the ```ServletContext``` and call ```close()``` when 
+the ```ServletContext``` shuts down.
 
 * **(active) tool-app:** In this case the tool's main thread will
 create the Spring application context, retrieve beans from it
@@ -208,6 +208,10 @@ execute the ```java``` call more than once) but you have to update
 your ```${CP}``` when you change the project dependencies (which will
 not be that often once your project has stablized).
 
+You run the *driver* as a *server-app* like this:
+
+	java -cp ${CP} -Dwait-for-sac-close clojure.main -m spring-break.core spring-config-empty.xml
+
 ## Working offline
 
 **This needs to be worked over**
@@ -236,6 +240,8 @@ Run:
 
     CP=`lein classpath`
 	java -cp ${CP} javastuff.Driver spring-config-empty.xml
+
+**TODO: port Clojure driver to Java driver incl. recent enhancements**
 
 ## Running with an uberjar
 
@@ -307,8 +313,10 @@ Try this:
 
 	lein run spring-config-load-script.xml load_script_code
 
-You'll see that the Spring bean ```load_script_code``` has the value ```null``` --- that is the value of the last form that is
-evaluated. Try putting this into ```src/main/clojure/no-namespace-scripts/script-code.clj```
+ You'll see that the Spring bean ```load_script_code``` has the value
+ ```null``` --- that is the value of the last form that is
+ evaluated. Try putting this into
+ ```src/main/clojure/no-namespace-scripts/script-code.clj```
 
 	(printf "+++ loading script-code.clj in namespace '%s'\n" *ns*)
 	"foobar"
