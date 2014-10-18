@@ -1,6 +1,5 @@
 (ns spring-break.jmx)
 
-;; Evaluation kann man via #=() erreichen.
 (defn fn-wrapper-of [a-fn]
   (proxy [java.text.Format][]
     (toString [] (format "(fn-wrapper-of %s meta=%s)" a-fn (meta a-fn)))
