@@ -1086,7 +1086,7 @@ on our Clojure-based ```mbean-info-assembler``` (nested Spring bean)
 which delivers the *JMX view of the published beans*
 (```javax.management.modelmbean.ModelMBeanInfoSupport```; see
 below). In this example we will publish any bean whose name matches
-```#"clj_.*"```. Each function will be published with an JMX
+```#"clj_.*"```. Each function will be published with a JMX
 ```ObjectName``` of ```(format "clojure-beans:name=%s" bean-key)```
 (see ```namingStrategy```). This will show-up in *jconsole* as the
 MBean name.
@@ -1104,15 +1104,15 @@ MBean name.
 	    </bean>
 	  </property>
 
-	  <property name="assembler">
-	    <bean parent="clojure_fact">
-		  <constructor-arg value='
-		    (require (symbol "spring-break.jmx"))
-			  (spring-break.jmx/mbean-info-assembler 
-			    #(not (nil? (re-matches #"clj_.*" %))))
-	      ' />
-		</bean>
-	  </property>
+      <property name="assembler">
+        <bean parent="clojure_fact">
+	      <constructor-arg value='
+            (require (symbol "spring-break.jmx"))
+	        (spring-break.jmx/mbean-info-assembler 
+	          #(boolean (re-matches #"clj_.*" %)))
+          ' />
+        </bean>
+      </property>
 	</bean>
 
 The ```mbean-info-assembler``` serves two purposes:
@@ -1148,60 +1148,63 @@ and create the *JMX view* via ```fn-wrapper-of```.
 
 There are some things to note:
 
-(1) *jconsole* can handle ```java.lang.String``` typed method paramters
-and build the GUI so that you can enter those parameter values. It
-won't let you enter anything for ```java.lang.Object``` typed
-parameters.
+* *jconsole* can handle ```java.lang.String``` typed method paramters
+  and build the GUI so that you can enter those parameter values. It
+  won't let you enter anything for ```java.lang.Object``` typed
+  parameters.
 
-**TODO: what if we just claim that it a of type String even if it is
+  **TODO: what if we just claim that it a of type String even if it is
   not?**
 
-(2) Since you may publish variadic functions, we may have to enter
-**multiple parameter values** and we **don't know in advance** how
-many that may be. That's something *jconsole* does not support (means:
-I haven't found out how to do it yet; of course *jonsole* supports
-entering more than one parameter value, but this number has to be
-fixed at JMX registration time).
+* Since you may publish variadic functions, we may have to enter
+  **multiple parameter values** and we **don't know in advance** how
+  many that may be. That's something *jconsole* does not support
+  (means: I haven't found out how to do it yet; of course *jonsole*
+  supports entering more than one parameter value, but this number has
+  to be fixed at JMX registration time).
 
-So I'm using a *wrapper method* with just one ```java.lang.String```
-parameter. The *String input* is then parsed via ```(read-string
-(format "[%s]" string-input))```. So you can enter **multiple forms**
-in the *jconsole* GUI text field which will be wrapped in a ```vector```.
+  So I'm using a *wrapper method* with just one ```java.lang.String```
+  parameter. The *String input* is then parsed via ```(read-string
+  (format "[%s]" string-input))```. So you can enter **multiple
+  forms** in the *jconsole* GUI text field which will be wrapped in a
+  ```vector```.
 
-Your function then gets called via ```(apply <your-fn> <parsed-input>)```.
+  Your function then gets called via ```(apply <your-fn>
+  <parsed-input>)```.
 
-Note that I'm using ```read-string``` so **the user may call arbitrary
-code via ```#=(<code>)``` reader macro** before your function is in
-control.
+  Note that I'm using ```read-string``` so **the user may call
+  arbitrary code via ```#=(<code>)``` reader macro** before your
+  function is in control.
 
-(3) Your function's returned value will be deserialized over to a
-remote calling client. In order to prevent classloading problems the
-*wrapper method* will transform the returned value via ```(pr-str)```
-into a ```String```. If your function throws an ```Exception``` the
-*wrapper method* will create and throw a ```RuntimeException```
-instead and copy the original ```Exception```'s stacktrace into
-that. This way you lose the exception type but you still get the
-stacktrace.
+* Your function's returned value will be deserialized over to a remote
+  calling client. In order to prevent classloading problems the
+  *wrapper method* will transform the returned value via
+  ```(pr-str)``` into a ```String```. If your function throws an
+  ```Exception``` the *wrapper method* will create and throw a
+  ```RuntimeException``` instead and copy the original
+  ```Exception```'s stacktrace into that. This way you lose the
+  exception type but you still get the stacktrace.
 
-In the end a remote calling will either receive a
-```java.lang.String``` (as of ```(pr)```) or a ```RuntimeException```
-both of which can be deserialized in any case.
+  In the end a remote calling will either receive a
+  ```java.lang.String``` (as of ```(pr)```) or a
+  ```RuntimeException``` both of which can be deserialized in any
+  case.
 
-**TODO: copy cause-chain**
+  **TODO: copy cause-chain**
 
-In order for JMX to be able to call the *wrapper method* it has to be
-a *named method* of the form ```<some-type> <method-name>(String)```.
-Since I wanted to get by without using AOT I
-looked for some JDK interface with such a signature and found
-```String parseObject(String)``` in ```java.text.Format```.
+* In order for JMX to be able to call the *wrapper method* it has to
+  be a *named method* of the form ```<some-type>
+  <method-name>(String)```.  Since I wanted to get by without using
+  AOT I looked for some JDK interface with such a signature and found
+  ```String parseObject(String)``` in ```java.text.Format```.
 
-That's why ```fn-wrapper-of``` returns a ```(proxy
-[java.text.Format])``` with ```parseObject``` being the *wrapper
-method* around your Clojure function. When you run *jconsole* you will
-see ```parseObject``` as the *operations* name in the GUI.
+  That's why ```fn-wrapper-of``` returns a ```(proxy
+  [java.text.Format])``` with ```parseObject``` being the *wrapper
+  method* around your Clojure function. When you run *jconsole* you
+  will see ```parseObject``` as the *operations* name in the GUI.
 
-**TODO: is there a way to display a different lable?**
-
+  **TODO: is there a way to display a different lable?**
+  
 The relevant part of the code looks like this:
 
 	(defn fn-wrapper-of [a-fn]
@@ -1216,8 +1219,8 @@ The relevant part of the code looks like this:
 				res-str (pr-str res)]
 			res-str))))
 
-Run the example. This time we have to tell the *driver* to not just
-exit but to wait until the Spring application context gets closed.
+Run the example. This time we use the *driver* as a *server-app* (see
+above):
 
 	CP=$(JAVA_CMD=`which java` lein classpath)
 	java -cp ${CP} -Dwait-for-sac-close clojure.main -m spring-break.core spring-config-jmx.xml
@@ -1225,12 +1228,11 @@ exit but to wait until the Spring application context gets closed.
 Start *jconsole* and go to the *MBeans* tab. You should see a
 ```clojure-beans``` JMX domain and ```clj_echo``` (besides others). In
 the text field you may enter ```(+ 1 2)``` and submit via
-```parseObject```. The returned value should be ```(+ 1 2)``` (hence
-the name of this bean ;-) Now try ```#=(+ 1 2)```. This should give
-you ```3```.
+```parseObject``` button. The returned value should be ```(+ 1 2)```
+(hence the name of this bean ;-) Now try ```#=(+ 1 2)```. This should
+give you ```3```.
 
 I put some more *Clojure function JMX beans* in there.
-
 
 # More to come
 

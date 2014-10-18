@@ -24,7 +24,7 @@
 	<constructor-arg value='
         (require (symbol "spring-break.jmx"))
 	(spring-break.jmx/mbean-info-assembler 
-	  #(not (nil? (re-matches #"clj_.*" %))))
+	  #(boolean (re-matches #"clj_.*" %)))
         ' />
       </bean>
     </property>
