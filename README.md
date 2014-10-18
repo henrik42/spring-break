@@ -1166,8 +1166,8 @@ There are some things to note:
   So I'm using a *wrapper method* with just one ```java.lang.String```
   parameter. The *String input* is then parsed via ```(read-string
   (format "[%s]" string-input))```. So you can enter **multiple
-  forms** in the *jconsole* GUI text field which will be wrapped in a
-  ```vector```.
+  forms** in the *jconsole* GUI text field which will be wrapped in
+  a ```vector```.
 
   Your function then gets called via ```(apply <your-fn>
   <parsed-input>)```.
@@ -1178,16 +1178,16 @@ There are some things to note:
 
 * Your function's returned value will be deserialized over to a remote
   calling client. In order to prevent classloading problems the
-  *wrapper method* will transform the returned value via
-  ```(pr-str)``` into a ```String```. If your function throws an
-  ```Exception``` the *wrapper method* will create and throw a
-  ```RuntimeException``` instead and copy the original
-  ```Exception```'s stacktrace into that. This way you lose the
+  *wrapper method* will transform the returned value 
+  via ```(pr-str)``` into a ```String```. If your function throws 
+  an ```Exception``` the *wrapper method* will create and throw 
+  a ```RuntimeException``` instead and copy the 
+  original ```Exception```'s stacktrace into that. This way you lose the
   exception type but you still get the stacktrace.
 
-  In the end a remote calling will either receive a
-  ```java.lang.String``` (as of ```(pr)```) or a
-  ```RuntimeException``` both of which can be deserialized in any
+  In the end a remote calling will either receive 
+  a ```java.lang.String``` (as of ```(pr)```) or 
+  a ```RuntimeException``` both of which can be deserialized in any
   case.
 
   **TODO: copy cause-chain**
@@ -1195,8 +1195,8 @@ There are some things to note:
 * In order for JMX to be able to call the *wrapper method* it has to
   be a *named method* of the form ```<some-type>
   <method-name>(String)```.  Since I wanted to get by without using
-  AOT I looked for some JDK interface with such a signature and found
-  ```String parseObject(String)``` in ```java.text.Format```.
+  AOT I looked for some JDK interface with such a signature and 
+  found ```String parseObject(String)``` in ```java.text.Format```.
 
   That's why ```fn-wrapper-of``` returns a ```(proxy
   [java.text.Format])``` with ```parseObject``` being the *wrapper
