@@ -313,10 +313,10 @@ Try this:
 
 	lein run spring-config-load-script.xml load_script_code
 
- You'll see that the Spring bean ```load_script_code``` has the value
- ```null``` --- that is the value of the last form that is
- evaluated. Try putting this into
- ```src/main/clojure/no-namespace-scripts/script-code.clj```
+You'll see that the Spring bean ```load_script_code``` has the 
+value ```null``` --- that is the value of the last form that is
+evaluated. Try putting this 
+into ```src/main/clojure/no-namespace-scripts/script-code.clj```
 
 	(printf "+++ loading script-code.clj in namespace '%s'\n" *ns*)
 	"foobar"
