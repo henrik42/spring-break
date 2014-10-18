@@ -14,6 +14,6 @@
   :main spring-break.core
   ;;:java-cmd "/opt/jdk1.8.0/bin/java"
   :local-repo "local-m2"
-  :profiles {:server-app {:jvm-opts ["-Dwait-for-sac-close=xx"]}})
+  :profiles {:server-app {:jvm-opts ["-Dwait-for-sac-close"]}})
 
 

@@ -318,7 +318,7 @@ value ```null``` --- that is the value of the last form that is
 evaluated. Try putting this 
 into ```src/main/clojure/no-namespace-scripts/script-code.clj```
 
-	(printf "+++ loading script-code.clj in namespace '%s'\n" *ns*)
+    (.print System/out (format "+++ loading %s in namespace '%s'\n" *file* *ns*))
 	"foobar"
 
 and re-run.
