@@ -1,10 +1,11 @@
-(def springframework-version "3.2.11.RELEASE" #_ "3.0.5.RELEASE")
+(def springframework-version "3.2.11.RELEASE")
 (defproject spring-break "0.1.0-SNAPSHOT"
   :description "A Clojure library for Clojure/Spring integration."
   :url "http://example.com/FIXME"
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [swank-clojure "1.4.3"]
                  [org.clojure/tools.nrepl "0.2.5"]
+                 [org.clojure/java.jmx "0.3.0"]
                  [org.springframework/spring-core ~springframework-version]
                  [org.springframework/spring-context ~springframework-version]
                  [org.springframework/spring-beans ~springframework-version]]

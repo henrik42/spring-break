@@ -1080,6 +1080,8 @@ the Spring documentation for details). Here I want to show how to
 register **Clojure functions as JMX operations**. This lets you call
 any of those funtions via *jconsole* (or any other JMX client).
 
+## MBeanExporter
+
 The ```org.springframework.jmx.export.MBeanExporter``` will *drive*
 the registration/publishing. It iterates over all beans and calls-back
 on our Clojure-based ```mbean-info-assembler``` (nested Spring bean)
@@ -1115,6 +1117,8 @@ MBean name.
       </property>
 	</bean>
 
+## spring-break.jmx/mbean-info-assembler
+
 The ```mbean-info-assembler``` serves two purposes:
 
 (1) It decides which beans will be *included*/published (via the
@@ -1132,6 +1136,8 @@ Here's the code: (more details below)
 		(getMBeanInfo [bean-obj bean-name]
 		  (make-model-mbean-info bean-obj bean-name))))
 
+## JMX bean "clj_echo"
+
 Now we can define the first *Clojure function JMX bean*:
 
 	  <bean id="clj_echo" parent="clojure_fact">
@@ -1145,6 +1151,22 @@ We have some function (```(fn [a] a)``` in this case)
 and create the *JMX view* via ```fn-wrapper-of```.
 
 **TODO: do this via auto-proxying**
+
+## spring-break.jmx/fn-wrapper-of
+
+The relevant part of the code looks like this:
+
+	(defn fn-wrapper-of [a-fn]
+	  (proxy [java.text.Format][]
+		(parseObject [a-str]
+		  (let [arg (read-string (format "[%s]" a-str))
+				res (try
+					  (apply a-fn arg)
+					  (catch Exception x
+						(throw (doto (RuntimeException. (str x))
+								 (.setStackTrace (.getStackTrace x))))))
+				res-str (pr-str res)]
+			res-str))))
 
 There are some things to note:
 
@@ -1185,8 +1207,8 @@ There are some things to note:
   original ```Exception```'s stacktrace into that. This way you lose the
   exception type but you still get the stacktrace.
 
-  In the end a remote calling will either receive 
-  a ```java.lang.String``` (as of ```(pr)```) or 
+  In the end a remote calling client will either receive 
+  a ```java.lang.String``` (as of ```(pr-str)```) or 
   a ```RuntimeException``` both of which can be deserialized in any
   case.
 
@@ -1201,26 +1223,13 @@ There are some things to note:
   That's why ```fn-wrapper-of``` returns a ```(proxy
   [java.text.Format])``` with ```parseObject``` being the *wrapper
   method* around your Clojure function. When you run *jconsole* you
-  will see ```parseObject``` as the *operations* name in the GUI.
+  will see ```parseObject``` as the *operation's* name in the GUI.
 
   **TODO: is there a way to display a different lable?**
-  
-The relevant part of the code looks like this:
 
-	(defn fn-wrapper-of [a-fn]
-	  (proxy [java.text.Format][]
-		(parseObject [a-str]
-		  (let [arg (read-string (format "[%s]" a-str))
-				res (try
-					  (apply a-fn arg)
-					  (catch Exception x
-						(throw (doto (RuntimeException. (str x))
-								 (.setStackTrace (.getStackTrace x))))))
-				res-str (pr-str res)]
-			res-str))))
+## Run the example
 
-Run the example. This time we use the *driver* as a *server-app* (see
-above):
+This time we use the *driver* as a *server-app* (see above):
 
 	CP=$(JAVA_CMD=`which java` lein classpath)
 	java -cp ${CP} -Dwait-for-sac-close clojure.main -m spring-break.core spring-config-jmx.xml
