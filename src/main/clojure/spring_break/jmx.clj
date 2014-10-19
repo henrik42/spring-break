@@ -1,4 +1,16 @@
-(ns spring-break.jmx)
+(ns spring-break.jmx
+  (require [clojure.java.jmx :as jmx]))
+
+;; A JMX client
+(defn -main [mbean a-str & {:keys [port host meth]
+                            :or {port 9999 host "127.0.0.1" meth :parseObject}}]
+  (jmx/with-connection {:host host :port port}
+    (.println System/out
+              (format "+++ Calling %s on %s with '%s' returns '%s'"
+                      meth
+                      mbean
+                      a-str
+                      (jmx/invoke mbean meth a-str)))))
 
 (defn fn-wrapper-of [a-fn]
   (proxy [java.text.Format][]

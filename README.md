@@ -1231,17 +1231,36 @@ There are some things to note:
 
 This time we use the *driver* as a *server-app* (see above):
 
+	lein trampoline with-profile server-app run spring-config-jmx.xml
+	
+or:
+
 	CP=$(JAVA_CMD=`which java` lein classpath)
 	java -cp ${CP} -Dwait-for-sac-close clojure.main -m spring-break.core spring-config-jmx.xml
 
-Start *jconsole* and go to the *MBeans* tab. You should see a
-```clojure-beans``` JMX domain and ```clj_echo``` (besides others). In
-the text field you may enter ```(+ 1 2)``` and submit via
-```parseObject``` button. The returned value should be ```(+ 1 2)```
-(hence the name of this bean ;-) Now try ```#=(+ 1 2)```. This should
-give you ```3```.
+Start *jconsole*, connect to the JVM and go to the *MBeans* tab. You
+should see a ```clojure-beans``` JMX domain and ```clj_echo```
+(besides others). In the text field you may enter ```(+ 1 2)``` and
+submit via ```parseObject``` button. The returned value should be
+```(+ 1 2)``` (hence the name of this bean ;-) Now try ```#=(+ 1
+2)```. This should give you ```3```.
 
-I put some more *Clojure function JMX beans* in there.
+## Calling JMX operation remotely via clojure.java.jmx/invoke
+
+In the example above we connected locally to the JVM. Now we want to
+access the JMX Clojure functions programmatically via RMI
+(i.e. remotely).
+
+In the ```project.clj``` I put a ```:jmx-server-app``` profile that
+includes ```:server-app``` and defines some
+```com.sun.management.jmxremote.*``` system properties. When you run
+this, the JMX port will be opened at ```9999```:
+
+	lein trampoline with-profile jmx-server-app run spring-config-jmx.xml
+
+Now you can run the client:
+
+	lein run -m spring-break.jmx  clojure-beans:name=clj_echo "#=(rand)"
 
 # More to come
 

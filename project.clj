@@ -15,6 +15,13 @@
   :main spring-break.core
   ;;:java-cmd "/opt/jdk1.8.0/bin/java"
   :local-repo "local-m2"
-  :profiles {:server-app {:jvm-opts ["-Dwait-for-sac-close"]}})
+  :profiles {:server-app {:jvm-opts ["-Dwait-for-sac-close"]}
+             :jmx-server-app [:server-app
+                              {:jvm-opts
+                               ["-Dcom.sun.management.jmxremote"
+                                "-Dcom.sun.management.jmxremote.port=9999"
+                                "-Dcom.sun.management.jmxremote.authenticate=false"
+                                "-Dcom.sun.management.jmxremote.ssl=false"]}]
+             })
 
 
