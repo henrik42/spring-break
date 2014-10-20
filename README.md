@@ -1277,6 +1277,10 @@ or:
     CP=$(JAVA_CMD=`which java` lein classpath)
     java -cp ${CP} clojure.main -m spring-break.jmx clojure-beans:name=clj_echo "#=(rand)"
 
+And for just playing around:
+
+	java -cp ${CP} clojure.main -e "(use 'spring-break.jmx) (-main \"clojure-beans:name=clj_echo\" \"#=(+ 1 2)\")"
+
 # More to come
 
 OK, this is it for today. 
