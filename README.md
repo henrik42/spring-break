@@ -152,15 +152,15 @@ This is the relevant part of the *driver* code:
   down via the *driver's* ```(.close sac)``` (not ```finally```
   wrapped here).
 
-* When run as a *server-app* the *driver*'s main threads waits on a
-  ```@(promise)``` (that's a lot easier than a ```wait``` for a
-  ```notify``` which often leads to *missed wake-ups* if you not
+* When run as a *server-app* the *driver*'s main threads waits on 
+  a ```@(promise)``` (that's a lot easier than a ```wait``` for
+  a ```notify``` which often leads to *missed wake-ups* if you not
   really know what you're doing). ```ClassPathXmlApplicationContext```
   has an empty method ```onClose()``` which derived classes are
   supposed to override. But Spring's ```close()``` implementation does
   not wrap the call to ```onClose()``` in a ```finally``` so I rather
-  override ```close()```. In addition you can check via
-  ```isActive()``` if the shutdown has succeeded or not.
+  override ```close()```. In addition you can check 
+  via ```isActive()``` if the shutdown has succeeded or not.
 
 You can run the *driver* as a *server-app* like this:
 
@@ -348,11 +348,11 @@ Try this:
 
 		lein uberjar 
 
-* Run the driver app with
-  ```classpath\*:spring-config-load-script.xml``` (this tells Spring
+* Run the driver app 
+  with ```classpath\*:spring-config-load-script.xml``` (this tells Spring
   to load **all occurences** of the named resource) and an *extended
-  classpath* (```:./resources/```). This way we have the **resource
-  ```spring-config-load-script.xml```** **twice** in our classpath:
+  classpath* (```:./resources/```). This way we have the 
+  **resource ```spring-config-load-script.xml```** **twice** in our classpath:
 
 		java -cp target/spring-break-0.1.0-SNAPSHOT-standalone.jar:./resources/ \
 		clojure.main -m spring-break.core classpath\*:spring-config-load-script.xml 
@@ -366,8 +366,8 @@ difference. Now insert ```id="load_script_code"``` back in and re-run
 
  In ```resources/spring-config-load-script-with-sideeffect.xml``` I
  put a second bean definition that calls the function ```foo/foobar```
- which gets ```def```ined in
- ```src/main/clojure/no-namespace-scripts/script-code-with-function.clj```. Note
+ which gets ```def```ined 
+ in ```src/main/clojure/no-namespace-scripts/script-code-with-function.clj```. Note
  that we have to explicitly name the namespace ```foo``` because
  *this* code is ```eval```uated in namespace ```user```.
 
@@ -1087,9 +1087,9 @@ the registration/publishing. It iterates over all beans and calls-back
 on our Clojure-based ```mbean-info-assembler``` (nested Spring bean)
 which delivers the *JMX view of the published beans*
 (```javax.management.modelmbean.ModelMBeanInfoSupport```; see
-below). In this example we will publish any bean whose name matches
-```#"clj_.*"```. Each function will be published with a JMX
-```ObjectName``` of ```(format "clojure-beans:name=%s" bean-key)```
+below). In this example we will publish any bean whose name 
+matches ```#"clj_.*"```. Each function will be published with a
+JMX ```ObjectName``` of ```(format "clojure-beans:name=%s" bean-key)```
 (see ```namingStrategy```). This will show-up in *jconsole* as the
 MBean name.
 
@@ -1241,8 +1241,8 @@ or:
 Start *jconsole*, connect to the JVM and go to the *MBeans* tab. You
 should see a ```clojure-beans``` JMX domain and ```clj_echo```
 (besides others). In the text field you may enter ```(+ 1 2)``` and
-submit via ```parseObject``` button. The returned value should be
-```(+ 1 2)``` (hence the name of this bean ;-) Now try ```#=(+ 1
+submit via ```parseObject``` button. The returned value should 
+be ```(+ 1 2)``` (hence the name of this bean ;-) Now try ```#=(+ 1
 2)```. This should give you ```3```.
 
 ## Calling JMX operation remotely via clojure.java.jmx/invoke
@@ -1252,15 +1252,30 @@ access the JMX Clojure functions programmatically via RMI
 (i.e. remotely).
 
 In the ```project.clj``` I put a ```:jmx-server-app``` profile that
-includes ```:server-app``` and defines some
-```com.sun.management.jmxremote.*``` system properties. When you run
-this, the JMX port will be opened at ```9999```:
+includes ```:server-app``` and defines 
+some ```com.sun.management.jmxremote.*``` system properties. When you run
+this, the JMX port will be opened at ```127.0.0.1:9999```:
 
 	lein trampoline with-profile jmx-server-app run spring-config-jmx.xml
 
+or:
+
+	CP=$(JAVA_CMD=`which java` lein classpath)
+    java -cp ${CP} -Dwait-for-sac-close \
+    -Dcom.sun.management.jmxremote \
+    -Dcom.sun.management.jmxremote.port=9999 \
+    -Dcom.sun.management.jmxremote.authenticate=false \
+    -Dcom.sun.management.jmxremote.ssl=false \
+    clojure.main -m spring-break.core spring-config-jmx.xml
+
 Now you can run the client:
 
-	lein run -m spring-break.jmx  clojure-beans:name=clj_echo "#=(rand)"
+	lein run -m spring-break.jmx clojure-beans:name=clj_echo "#=(rand)"
+
+or:
+
+    CP=$(JAVA_CMD=`which java` lein classpath)
+    java -cp ${CP} clojure.main -m spring-break.jmx clojure-beans:name=clj_echo "#=(rand)"
 
 # More to come
 
