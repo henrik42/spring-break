@@ -12,8 +12,27 @@
                       a-str
                       (jmx/invoke mbean meth a-str)))))
 
+;; JMX Attribute stuff
+(defmulti set-value (fn [r v] (class r)))
+(defmethod set-value clojure.lang.Atom [an-atom v]
+  (reset! an-atom v))
+(defmethod set-value clojure.lang.Ref [a-ref v]
+  (dosync 
+   (ref-set a-ref v)))
+
+(defn ref-wrapper-of [a-ref]
+  (reify clojure.lang.IFn
+    (toString [this] (format "(ref-wrapper-of %s meta=%s)" a-ref (meta a-ref)))
+    (invoke [this]
+      (.println System/out (str "returning " @a-ref))
+      @a-ref)
+    (invoke [this v]
+      (.println System/out (str "setting " v " on " a-ref))
+      (set-value a-ref v))))
+
+;; JMX Operation wrapper
 (defn fn-wrapper-of [a-fn]
-  (proxy [java.text.Format][]
+  (proxy [java.text.Format Runnable][] ;; Runnable is marker for JMX operation (vs. attribute)
     (toString [] (format "(fn-wrapper-of %s meta=%s)" a-fn (meta a-fn)))
     (parseObject [a-str]
       (let [fmt "+++ Calling (%s [meta=%s] %s)"
@@ -52,14 +71,69 @@
    javax.management.MBeanOperationInfo/ACTION_INFO
    nil)) ;; descriptor
 
+(defn make-getter [ref-wrapper]
+  (let [getter (-> ref-wrapper
+                   (.getClass)
+                   (.getMethod "invoke"
+                               (into-array Class [])))]
+    (.println System/out (format "!!! getter = %s" getter))
+    getter))
+
+(defn __make-getter [a-ref]
+  (let [getter-proxy
+        (proxy [clojure.lang.IFn][]
+          (invoke []
+            (.println System/out (format "getter called: %s" @a-ref))
+            @a-ref))
+        getter (-> getter-proxy
+                   (.getClass)
+                   (.getMethod "invoke"
+                               (into-array Class [])))]
+    getter))
+    
+(defn make-setter [ref-wrapper]
+  (let [setter (-> ref-wrapper
+                   (.getClass)
+                   (.getMethod "invoke"
+                               (into-array Class [Object])))]
+    (.println System/out (format "!!! setter = %s" setter))
+    setter))
+
+(defn ___make-setter [a-ref]
+  (let [setter-proxy nil
+        setter nil]
+    setter))
+
+(defn make-model-mbean-attribute-info [bean-obj]
+  (let [getter (make-getter bean-obj)
+        setter (make-setter bean-obj)]
+    (.println System/out (format "!!! getter returns %s"
+                                 (.invoke getter bean-obj (into-array Object []))))
+    (.invoke setter bean-obj (into-array Object ["foo"]))
+    (.println System/out (format "!!! getter returns %s"
+                                 (.invoke getter bean-obj (into-array Object []))))
+    (javax.management.modelmbean.ModelMBeanAttributeInfo.
+     "a name"
+     "a descrption"
+     getter
+     nil #_ setter
+     nil))) ;; descriptor=nil
+
 (defn make-model-mbean-info [bean-obj bean-name]
-  (javax.management.modelmbean.ModelMBeanInfoSupport.
-   "classname ignored!"
-   "description ignored"
-   (into-array javax.management.modelmbean.ModelMBeanAttributeInfo [])
-   (into-array javax.management.modelmbean.ModelMBeanConstructorInfo [])
-   (into-array [(make-model-mbean-operation-info)])
-   (into-array javax.management.modelmbean.ModelMBeanNotificationInfo [])))
+  (let [is-fn (instance? java.text.Format bean-obj)
+        _ (.println System/out
+                    (format
+                     "+++ making model-mbean-info for bean-obj = %s  is-fn = %s"
+                     bean-obj is-fn))]
+    (javax.management.modelmbean.ModelMBeanInfoSupport.
+     "classname ignored!"
+     "description ignored"
+     (into-array javax.management.modelmbean.ModelMBeanAttributeInfo
+                 (if-not is-fn [(make-model-mbean-attribute-info bean-obj)] []))
+     (into-array javax.management.modelmbean.ModelMBeanConstructorInfo [])
+     (into-array javax.management.modelmbean.ModelMBeanOperationInfo
+                 (if is-fn [(make-model-mbean-operation-info)] []))
+     (into-array javax.management.modelmbean.ModelMBeanNotificationInfo []))))
 
 (defn mbean-info-assembler [pred]
   (proxy [org.springframework.jmx.export.assembler.AutodetectCapableMBeanInfoAssembler][]

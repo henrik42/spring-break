@@ -30,14 +30,22 @@
     </property>
   </bean>
 
-  <bean id="clj_echo" parent="clojure_fact">
+  <bean id="clj_state" parent="clojure_fact">
+    <constructor-arg value="
+    (require 'spring-break.jmx)
+    (spring-break.jmx/ref-wrapper-of (atom 42))
+    (spring-break.jmx/ref-wrapper-of (ref 42))
+    " />
+  </bean>
+
+  <bean id="_clj_echo" parent="clojure_fact">
     <constructor-arg value="
     (require 'spring-break.jmx)
     (spring-break.jmx/fn-wrapper-of ^{:info :echo} (fn [a] a))
     " />
   </bean>
 
-  <bean id="clj_swap" parent="clojure_fact">
+  <bean id="_clj_swap" parent="clojure_fact">
     <constructor-arg value="
     (require 'spring-break.jmx)
     (spring-break.jmx/fn-wrapper-of ^{:info :swap} (fn [a b] [b a]))
