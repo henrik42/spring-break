@@ -286,6 +286,61 @@ Run:
 
 	lein run spring-config-hello-world.xml hello_world
 
+Now try the Java-based *driver*:
+
+    CP=`lein classpath`
+	java -cp ${CP} javastuff.Driver spring-config-hello-world.xml hello_world
+
+This will give you a ```java.lang.NullPointerException```:
+
+    [...]
+	Caused by: java.lang.ExceptionInInitializerError
+		at clojure.lang.Compiler.<clinit>(Compiler.java:47)
+		at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+		at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+		at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+		at java.lang.reflect.Method.invoke(Method.java:483)
+		at org.springframework.beans.factory.support.SimpleInstantiationStrategy.instantiate(SimpleInstantiationStrategy.java:160)
+		at org.springframework.beans.factory.support.ConstructorResolver.instantiateUsingFactoryMethod(ConstructorResolver.java:592)
+		... 14 more
+	Caused by: java.lang.NullPointerException
+		at clojure.lang.RT.baseLoader(RT.java:2043)
+		at clojure.lang.RT.load(RT.java:417)
+		at clojure.lang.RT.load(RT.java:411)
+		at clojure.lang.RT.doInit(RT.java:447)
+		at clojure.lang.RT.<clinit>(RT.java:329)
+		... 21 more
+
+The cause is that we first load the class ```clojure.lang.Compiler```
+which in turn loads ```clojure.lang.RT```. Usually when using Clojure
+(e.g. the Clojure-based *driver* above) ```clojure.lang.RT``` is
+loaded first and there seems to be some ordering dependency within the
+static class initializers (```clojure.lang.Compiler``` probably is not
+part of the Clojure API so that's fine). So we have to make the JVM
+load ```clojure.lang.RT``` before Spring creates our ```hello_world```
+bean --- like this:
+
+	  <bean id="load_clojure_lang_rt" class="clojure.lang.RT" factory-method="nextID" />
+
+	  <bean id="hello_world" 
+		class="clojure.lang.Compiler" 
+		depends-on="load_clojure_lang_rt"
+		factory-method="load">
+		<constructor-arg>
+		  <bean class="java.io.StringReader">
+		    <constructor-arg value='"Hello world!"' />
+		  </bean>
+		</constructor-arg>
+	  </bean>
+
+Here we just call some static method in ```clojure.lang.RT``` to
+make Spring load the class.
+
+Run:
+
+    CP=`lein classpath`
+	java -cp ${CP} javastuff.Driver spring-config-hello-world-for-java-driver.xml hello_world
+
 ## Loading Clojure script files
 
 You can load Clojure script files via ```clojure.lang.Compiler/loadFile```:
@@ -448,12 +503,13 @@ whatever we put into ```spring-break.factories/clojure-object-factory```
 	
 	  <bean id="clojure_factory" 
 		class="clojure.lang.Compiler" 
+		depends-on="load_clojure_lang_rt"
 		factory-method="load">
 		<constructor-arg>
 		  <bean class="java.io.StringReader">
-			  <constructor-arg 
-				  value="(require 'spring-break.factories) 
-			      spring-break.factories/clojure-object-factory" />
+		    <constructor-arg 
+			  value="(require 'spring-break.factories) 
+			    spring-break.factories/clojure-object-factory" />
 		  </bean>
 		</constructor-arg>
 	  </bean>
@@ -510,6 +566,12 @@ I set up an XML file for this. So you may try:
 
 	lein run spring-config-factories.xml a_clojure_bean
 
+Note that I put the ```load_clojure_lang_rt``` bean definition in
+there too. So we can run this via the Java-based *driver* as well:
+
+    CP=`lein classpath`
+	java -cp ${CP} javastuff.Driver spring-config-factories.xml a_clojure_bean
+	
 ## Start Swank
 
 As a *special* side-effect you can start swank:

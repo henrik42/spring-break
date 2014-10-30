@@ -3,32 +3,17 @@
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
        xsi:schemaLocation="http://www.springframework.org/schema/beans 
 			   http://www.springframework.org/schema/beans/spring-beans-3.0.xsd">
-
-  <bean id="clojure_fact" 
-	abstract="true"
-	factory-bean="clojure_factory"
-	factory-method="new_instance">
-  </bean>
-
-  <bean id="a_clojure_bean" 
-	parent="clojure_fact">
-    <constructor-arg 
-	value=":it-works" />
-  </bean>
-
-  <bean id="load_clojure_lang_rt" class="clojure.lang.RT" factory-method="nextID" />
-
-  <bean id="clojure_factory" 
+  <bean id="hello_world" 
 	class="clojure.lang.Compiler" 
 	depends-on="load_clojure_lang_rt"
 	factory-method="load">
     <constructor-arg>
       <bean class="java.io.StringReader">
-	<constructor-arg 
-	    value="(require 'spring-break.factories) 
-		   spring-break.factories/clojure-object-factory" />
+	<constructor-arg value='"Hello world!"' />
       </bean>
     </constructor-arg>
   </bean>
+
+  <bean id="load_clojure_lang_rt" class="clojure.lang.RT" factory-method="nextID" />
 
 </beans>
