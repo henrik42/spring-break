@@ -20,14 +20,61 @@
   (dosync 
    (ref-set a-ref v)))
 
+(defn build-getter [s]
+  (let [getter (-> s
+                   (.getClass)
+                   (.getMethod "toString"
+                               (into-array Class [])))]
+    (.println System/out (format "!!! getter for %s = %s" s getter))
+    getter))
+
+(defn build-setter [s]
+  (let [setter (-> java.lang.Double
+                   (.getMethod "valueOf"
+                               (into-array Class [String])))]
+    (.println System/out (format "!!! setter for %s = %s" s setter))
+    setter))
+
 (defn ref-wrapper-of [a-ref]
+  (reify javax.management.DynamicMBean
+    (getMBeanInfo [this]
+      (javax.management.MBeanInfo.
+       (.. this getClass getName)                             ; class name
+       "Clojure Dynamic MBean"                             ; description
+       ;;(map->attribute-infos @state-ref)                   ; attributes
+       (into-array
+        [(javax.management.MBeanAttributeInfo.
+          "name"
+          "desc"
+          (build-getter this)
+          (build-setter this)
+          #_ setter)])
+       nil                                                 ; constructors
+       nil                                                 ; operations
+       nil)) ;; Descriptor
+    (setAttribute [this attr]
+      (let [n (.getName attr)
+            v (.getValue attr)]
+        (.print System/out (format "setting %s to %s (%s)" a-ref v (.getClass v)))
+        (set-value a-ref v)))
+    (getAttribute [_ attr]
+      (.println System/out "getAttribute called!")
+      @a-ref)
+    (getAttributes [_ attrs]
+      (.println System/out "getAttributeS called!")
+      (let [result (javax.management.AttributeList.)]
+        (.add result ^Object @a-ref)
+        result))))
+
+
+#_ (defn ref-wrapper-of [a-ref]
   (reify clojure.lang.IFn
     (toString [this] (format "(ref-wrapper-of %s meta=%s)" a-ref (meta a-ref)))
-    (invoke [this]
-      (.println System/out (str "returning " @a-ref))
+    (invoke [this] ;; getter
+      (.println System/out (str "***** returning " @a-ref))
       @a-ref)
-    (invoke [this v]
-      (.println System/out (str "setting " v " on " a-ref))
+    (invoke [this v] ;; setter
+      (.println System/out (str "***** setting " v " on " a-ref))
       (set-value a-ref v))))
 
 ;; JMX Operation wrapper
@@ -71,10 +118,18 @@
    javax.management.MBeanOperationInfo/ACTION_INFO
    nil)) ;; descriptor
 
-(defn make-getter [ref-wrapper]
+#_ (defn make-getter [ref-wrapper]
   (let [getter (-> ref-wrapper
                    (.getClass)
                    (.getMethod "invoke"
+                               (into-array Class [])))]
+    (.println System/out (format "!!! getter = %s" getter))
+    getter))
+
+(defn make-getter [ref-wrapper]
+  (let [getter (-> ref-wrapper
+                   (.getClass)
+                   (.getMethod "toString"
                                (into-array Class [])))]
     (.println System/out (format "!!! getter = %s" getter))
     getter))
@@ -104,9 +159,15 @@
         setter nil]
     setter))
 
-(defn make-model-mbean-attribute-info [bean-obj]
+#_ (defn make-model-mbean-attribute-info [bean-obj]
   (let [getter (make-getter bean-obj)
-        setter (make-setter bean-obj)]
+        setter nil #_ (make-setter bean-obj)
+        descriptor nil #_
+        (javax.management.modelmbean.DescriptorSupport.
+         (into-array
+          String
+          [#_ "openType=javax.management.openmbean.SimpleType(name=java.lang.String)"
+           "originalType=java.lang.Object"]))]
     (.println System/out (format "!!! getter returns %s"
                                  (.invoke getter bean-obj (into-array Object []))))
     (.invoke setter bean-obj (into-array Object ["foo"]))
@@ -117,7 +178,27 @@
      "a descrption"
      getter
      nil #_ setter
-     nil))) ;; descriptor=nil
+     descriptor)))
+
+(defn make-model-mbean-attribute-info [bean-obj]
+  (let [getter (make-getter bean-obj)
+        setter nil #_ (make-setter bean-obj)
+        info (javax.management.modelmbean.ModelMBeanAttributeInfo.
+              "Foo"
+              "a descrption"
+              getter
+              setter)
+        desc (.getDescriptor info)]
+    (.println System/out (format "!!! getter returns %s"
+                                 (.invoke getter bean-obj (into-array Object []))))
+    ;;(.invoke setter bean-obj (into-array Object ["foo"]))
+    (.println System/out (format "!!! getter returns %s"
+                                 (.invoke getter bean-obj (into-array Object []))))
+    (.setField desc "getMethod" (.getName getter))
+    ;;(.setField desc "currencyTimeLimit" (str Integer/MAX_VALUE))
+    #_ (.setField desc "setMethod" (.getName setter))
+    (.setDescriptor info desc)
+    info))
 
 (defn make-model-mbean-info [bean-obj bean-name]
   (let [is-fn (instance? java.text.Format bean-obj)
@@ -126,7 +207,8 @@
                      "+++ making model-mbean-info for bean-obj = %s  is-fn = %s"
                      bean-obj is-fn))]
     (javax.management.modelmbean.ModelMBeanInfoSupport.
-     "classname ignored!"
+     ;;"classname ignored!"
+     (.getName (.getClass bean-obj))
      "description ignored"
      (into-array javax.management.modelmbean.ModelMBeanAttributeInfo
                  (if-not is-fn [(make-model-mbean-attribute-info bean-obj)] []))
@@ -142,6 +224,6 @@
       (let [incl? (pred bean-name)]
         (.println System/out (format "+++ includeBean class=[%s] id=[%s] RETURNS %s" bean-class bean-name incl?))
         incl?))
-    (getMBeanInfo [bean-obj bean-name]
+    (getMBeanInfo [bean-obj bean-name] ;; returns javax.management.modelmbean.ModelMBeanInfo
       (.println System/out (format "+++ assembling bean=[%s] id=[%s]" bean-obj bean-name))
       (make-model-mbean-info bean-obj bean-name))))
