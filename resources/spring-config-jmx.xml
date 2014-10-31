@@ -33,8 +33,8 @@
   <bean id="clj_state" parent="clojure_fact">
     <constructor-arg value="
     (require 'spring-break.jmx)
-    (spring-break.jmx/ref-wrapper-of (atom 42))
-    (spring-break.jmx/ref-wrapper-of (ref 42))
+    (spring-break.jmx/make-mbean (atom 42 :validator number?))
+    #_ (spring-break.jmx/make-mbean (ref 42 :validator number?))
     " />
   </bean>
 

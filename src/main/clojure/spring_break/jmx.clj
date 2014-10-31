@@ -13,7 +13,7 @@
                       (jmx/invoke mbean meth a-str)))))
 
 ;; -------------------------------------------------------------------
-;; JMX Attribute stuff
+;; JMX Attribute
 ;; -------------------------------------------------------------------
 
 ;; changing the value of a reference type
@@ -38,16 +38,16 @@
       (.getMethod "getField"
                   (into-array [String]))))
 
-(defn ref-wrapper-of [a-ref]
+(defn make-mbean [a-ref]
   (reify javax.management.DynamicMBean
     (getMBeanInfo [this]
       (javax.management.MBeanInfo.
        "class name ignored"
-       "Some description"
+       "Some description" ;; pass in!
        (into-array
         [(javax.management.MBeanAttributeInfo.
-          "attribute name"
-          "attribute desc"
+          "the attribute name" ;; pass in!
+          "the attribute desc" ;; pass in!
           fake-getter
           fake-setter)])
        nil ;; no constructors
@@ -55,19 +55,34 @@
        nil)) ;; no notifications
     
     (setAttribute [this attr]
-      (let [n (.getName attr)
-            v (.getValue attr)]
-        (.print System/out (format "setting %s to %s (%s)" a-ref v (.getClass v)))
-        (set-value a-ref v)))
+      (let [a-str (.getValue attr)
+            fmt "+++ Setting JMX attribute '%s' (reference %s meta=%s) to [%s] (%s)"
+            arg (read-string a-str)]
+        (.println System/out (format fmt 
+                                     (.getName attr)
+                                     a-ref (meta a-ref)
+                                     arg (class arg)))
+        (try
+          ;; may fail due to validation!
+          ;; watches??
+          (set-value a-ref arg)
+          (catch Exception x
+            (.println System/out (format (str fmt " FAILS [%s]")
+                                         (.getName attr)
+                                         a-ref (meta a-ref)
+                                         arg (class arg)
+                                         x))
+            (throw (doto (RuntimeException. (str x))
+                     (.setStackTrace (.getStackTrace x))))))))
     
     (getAttribute [_ attr]
-      (.println System/out "getAttribute called!")
-      @a-ref)
+      ;;(.println System/out "getAttribute called!")
+      (pr-str @a-ref))
     
     (getAttributes [_ attrs]
-      (.println System/out "getAttributeS called!")
+      ;;(.println System/out "getAttributeS called!")
       (let [result (javax.management.AttributeList.)]
-        (.add result ^Object @a-ref)
+        (.add result ^Object (pr-str @a-ref))
         result))))
 
 ;; -------------------------------------------------------------------
@@ -142,5 +157,5 @@
         incl?))
     ;; will only be used for JMX operations/Clojure functions - not JMX attributes
     (getMBeanInfo [bean-obj bean-name] ;; returns javax.management.modelmbean.ModelMBeanInfo
-      (.println System/out (format "+++ assembling bean=[%s] id=[%s]" bean-obj bean-name))
+      (.println System/out (format "+++ assembling JMX operation bean=[%s] id=[%s]" bean-obj bean-name))
       (make-model-mbean-info bean-obj bean-name))))
