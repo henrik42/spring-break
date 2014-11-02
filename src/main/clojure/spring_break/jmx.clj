@@ -38,52 +38,73 @@
       (.getMethod "getField"
                   (into-array [String]))))
 
-(defn make-mbean [a-ref]
-  (reify javax.management.DynamicMBean
-    (getMBeanInfo [this]
-      (javax.management.MBeanInfo.
-       "class name ignored"
-       "Some description" ;; pass in!
-       (into-array
-        [(javax.management.MBeanAttributeInfo.
-          "the attribute name" ;; pass in!
-          "the attribute desc" ;; pass in!
-          fake-getter
-          fake-setter)])
-       nil ;; no constructors
-       nil ;; no operations
-       nil)) ;; no notifications
-    
-    (setAttribute [this attr]
-      (let [a-str (.getValue attr)
-            fmt "+++ Setting JMX attribute '%s' (reference %s meta=%s) to [%s] (%s)"
-            arg (read-string a-str)]
-        (.println System/out (format fmt 
-                                     (.getName attr)
-                                     a-ref (meta a-ref)
-                                     arg (class arg)))
-        (try
-          ;; may fail due to validation!
-          ;; watches??
-          (set-value a-ref arg)
-          (catch Exception x
-            (.println System/out (format (str fmt " FAILS [%s]")
-                                         (.getName attr)
-                                         a-ref (meta a-ref)
-                                         arg (class arg)
-                                         x))
-            (throw (doto (RuntimeException. (str x))
-                     (.setStackTrace (.getStackTrace x))))))))
-    
-    (getAttribute [_ attr]
-      ;;(.println System/out "getAttribute called!")
-      (pr-str @a-ref))
-    
-    (getAttributes [_ attrs]
-      ;;(.println System/out "getAttributeS called!")
-      (let [result (javax.management.AttributeList.)]
-        (.add result ^Object (pr-str @a-ref))
-        result))))
+(defn name-of [state]
+  (.println System/out (format "state %s meta %s" state (meta state)))
+  (:name (meta state)))
+
+(defn description-of [state]
+  (:description (meta state)))
+
+(defn make-mbean-attribute-info [state]
+  (javax.management.MBeanAttributeInfo.
+   (name-of state)
+   (description-of state)
+   fake-getter
+   fake-setter))
+
+(defn make-mbean [mbean-description & states]
+  (let [attrs (zipmap (map name-of states) states)]
+    (.println System/out (format "attrs = %s" attrs))
+    (reify javax.management.DynamicMBean
+      (getMBeanInfo [this]
+        (javax.management.MBeanInfo.
+         "class name ignored"
+         (name mbean-description)
+         (into-array
+          (map #(make-mbean-attribute-info %) states))
+         nil ;; no constructors
+         nil ;; no operations
+         nil)) ;; no notifications
+      
+      (setAttribute [this attr]
+        (let [a-str (.getValue attr)
+              state (attrs (.getName attr))
+              fmt "+++ Setting JMX attribute '%s' (reference %s meta=%s) to [%s] (%s)"
+              arg (read-string a-str)]
+          (.println System/out (format fmt 
+                                       (.getName attr)
+                                       state (meta state)
+                                       arg (class arg)))
+          (try
+            ;; may fail due to validation!
+            ;; watches??
+            (set-value state arg)
+            (catch Exception x
+              (.println System/out (format (str fmt " FAILS [%s]")
+                                           (.getName attr)
+                                           state (meta state)
+                                           arg (class arg)
+                                           x))
+              (throw (doto (RuntimeException. (str x))
+                       (.setStackTrace (.getStackTrace x))))))))
+      
+      (getAttribute [_ attr-name]
+        (.println System/out (format "(getAttribute %s)" attr-name))
+        (let [res (pr-str @(attrs attr-name))]
+          (.println System/out (format "(getAttribute %s) -> %s" attr-name res))
+          res))
+      
+      (getAttributes [_ attr-names]
+        (.println System/out (format "getAttributes %s" (vec attr-names)))
+        (let [result (javax.management.AttributeList.)]
+          (dorun
+           (for [attr-name attr-names
+                 :let [state (attrs attr-name)
+                       v (pr-str @state)]]
+             (do 
+               (.println System/out (format "state = %s value = %s" state v))
+               (.add result ^Object (pr-str @state)))))
+          result)))))
 
 ;; -------------------------------------------------------------------
 ;; JMX Operation
