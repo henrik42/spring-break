@@ -30,6 +30,18 @@
     </property>
   </bean>
 
+  <bean id="run_swank" 
+	parent="clojure_fact">
+    <constructor-arg 
+	value='
+	       (ns user
+	         (:use swank.swank))
+	       (println "+++ Starting swank server")
+	       (future 
+	           (start-server :port 4007))
+	       ' />
+  </bean>
+
   <bean id="clj_state" parent="clojure_fact">
     <constructor-arg value="
     (require 'spring-break.jmx)

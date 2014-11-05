@@ -68,7 +68,6 @@
                   (into-array [String]))))
 
 (defn name-of [state]
-  (.println System/out (format "state %s meta %s" state (meta state)))
   (:name (meta state)))
 
 (defn description-of [state]
@@ -129,56 +128,55 @@
                    (.setStackTrace (.getStackTrace x)))))))))
 
 (defn get-attribute [attr-name attrs]
-  (try
-    (do 
-      (.println System/out
-                (format "+++ (getAttribute %s)" attr-name))
-      (let [state (or @(attrs attr-name)
-                      (let [msg (format "%s %s" attr-name attrs)]
-                        (throw
-                         (RuntimeException. msg))))
-            res (pr-str state)]
-        (.println System/out
-                  (format "+++ (getAttribute %s) -> %s"
-                          attr-name
-                          res))
-        res))
-    (catch Exception x
-      (do
-        (.println System/out (str "ops" x))
-        (throw x)))))
+  (.println System/out (format "+++ (getAttribute %s %s) called" attr-name attrs))
+  (let [state (or (attrs attr-name)
+                  (throw (IllegalArgumentException.
+                          (format "Unknown attribute '%s'"
+                                  attr-name))))
+        res (pr-str @state)]
+    (.println System/out (format "+++ (getAttribute %s %s) returns %s" attr-name attrs res))
+    res))
 
 (defn get-attributes [attr-names attrs]
-  (.println System/out (format "getAttributes %s" (vec attr-names)))
+  (.println System/out (format "+++ (getAttributes %s %s) called"
+                               (vec attr-names)
+                               attrs))
   (let [result (javax.management.AttributeList.)]
     (dorun
      (for [attr-name attr-names
-           :let [state (attrs attr-name)
-                 v (pr-str @state)]]
-       (do 
-         (.println System/out (format "state = %s value = %s" state v))
-         (.add result ^Object (pr-str @state)))))
+           :let [state (or (attrs attr-name)
+                           (throw (IllegalArgumentException.
+                                   (format "Unknown attribute %s"
+                                           attr-name))))
+                 attr-value (pr-str @state)]]
+       (.add result ^Object attr-value)))
+    (.println System/out (format "+++ (getAttributes %s %s) returns %s"
+                                 (vec attr-names)
+                                 attrs result))
     result))
 
 ;; Creates a DynamicMBean
 ;; Exceptions are logged and mapped
 (defn make-mbean [mbean-description & states]
   (let [attrs (zipmap (map name-of states) states)]
-    (.println System/out (format "attrs = %s" attrs))
     (reify javax.management.DynamicMBean
+      ;; called via Spring
       (getMBeanInfo [this]
         (make-mbean-info this (str mbean-description) states))
 
+      ;; called via JMX
       (setAttribute [this attr]
-        (with-exception-mapping "(setAttribute %s)" [attr]
+        (with-exception-mapping "(setAttribute %s %s %s)" [this attr attrs]
           (set-attribute this attr attrs)))
       
+      ;; called via JMX
       (getAttribute [this attr-name]
-        (with-exception-mapping "(getAttribute %s)" [attr-name]
+        (with-exception-mapping "(getAttribute %s %s)" [attr-name attrs]
           (get-attribute attr-name attrs)))
       
+      ;; called via JMX
       (getAttributes [this attr-names]
-        (with-exception-mapping "(getAttributes %s)" [attr-names]
+        (with-exception-mapping "(getAttributes %s %s)" [attr-names attrs]
           (get-attributes attr-names attrs))))))
 
 ;; -------------------------------------------------------------------
