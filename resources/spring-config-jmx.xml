@@ -35,7 +35,10 @@
     (require 'spring-break.jmx)
     (spring-break.jmx/make-mbean 
       :my_mbean
-      (atom 42 :validator number? :meta {:name (str :an_atom) :description (name :a_description) }))
+      (atom 42 
+        :validator number? 
+	:meta {:name (str :an_atom) 
+	       :description (name :a_description) }))
     #_ (spring-break.jmx/make-mbean (atom 42 :validator number?))
     #_ (spring-break.jmx/make-mbean (ref 42 :validator number?))
     " />

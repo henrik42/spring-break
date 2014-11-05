@@ -13,6 +13,35 @@
                       (jmx/invoke mbean meth a-str)))))
 
 ;; -------------------------------------------------------------------
+;; Methods/functions called by JMX may throw exceptions which
+;; run up the call stack that is controlled by JMX.
+;; So there is not exception handler controlled by our code.
+;; The macro with-exception-mapping
+;; (a) prints exception stack traces to STDERR
+;; (b) Maps exception chains to RuntimeException so that
+;;     it is deserializable on remote clients that do not have
+;;     access to Clojure classes.
+;; -------------------------------------------------------------------
+(defn copy-exception-chain [x]
+  (let [cause (.getCause x)
+        cause-copy (if (or (= nil cause) (identical? cause x)) nil
+                       (copy-exception-chain cause))
+        copy (RuntimeException. (str x) cause-copy)]
+    copy))
+
+;; fmt and args will become part of the mapped
+;; exception. Use them to add context to the
+;; exception message
+(defmacro with-exception-mapping [fmt args & body]
+  `(try
+    ~@body
+    (catch Throwable t#
+      (let [msg# (apply format (str ~fmt " FAILED: %s") ~@args [t#])
+            x# (RuntimeException. msg# t#)]
+        (.printStackTrace x# System/err)
+        (throw (copy-exception-chain x#))))))
+
+;; -------------------------------------------------------------------
 ;; JMX Attribute
 ;; -------------------------------------------------------------------
 
@@ -45,6 +74,7 @@
 (defn description-of [state]
   (:description (meta state)))
 
+;; called from Spring not JMX
 (defn make-mbean-attribute-info [state]
   (javax.management.MBeanAttributeInfo.
    (name-of state)
@@ -52,59 +82,104 @@
    fake-getter
    fake-setter))
 
+;; called from Spring not JMX
+(defn make-mbean-info [mbean ^String mbean-description states]
+  (javax.management.MBeanInfo.
+   (str (class mbean)) ;; doesn't matter
+   mbean-description
+   (into-array
+    (map #(make-mbean-attribute-info %) states))
+   nil ;; no constructors
+   nil ;; no operations
+   nil)) ;; no notifications
+
+(defn set-attribute [mbean attr attrs]
+  (let [a-str (.getValue attr)
+        state (or (attrs (.getName attr))
+                  (let [msg (format "+++ State %s not found. Known states are %s." attr attrs)]
+                    (.println System/out msg)
+                    (throw (RuntimeException. msg))))
+        fmt "+++ Setting JMX attribute '%s' (%s meta=%s) \nto [%s] (%s)"
+        arg (try
+              (read-string a-str)
+              (catch Exception x
+                (let [msg (format (str fmt "\nread-string FAILS [%s]")
+                                  (.getName attr)
+                                  state (meta state)
+                                  a-str (class a-str)
+                                  x)]
+                  (.println System/out msg)
+                  (throw (doto (RuntimeException. msg)
+                           (.setStackTrace (.getStackTrace x)))))))]
+    (.println System/out (format fmt 
+                                 (.getName attr)
+                                 state (meta state)
+                                 arg (class arg)))
+    (try
+      ;; may fail due to validation!
+      (set-value state arg)
+      (catch Exception x
+        (let [msg (format (str fmt "\nFAILS [%s]")
+                          (.getName attr)
+                          state (meta state)
+                          arg (class arg)
+                          x)]
+          (.println System/out msg)
+          (throw (doto (RuntimeException. msg)
+                   (.setStackTrace (.getStackTrace x)))))))))
+
+(defn get-attribute [attr-name attrs]
+  (try
+    (do 
+      (.println System/out
+                (format "+++ (getAttribute %s)" attr-name))
+      (let [state (or @(attrs attr-name)
+                      (let [msg (format "%s %s" attr-name attrs)]
+                        (throw
+                         (RuntimeException. msg))))
+            res (pr-str state)]
+        (.println System/out
+                  (format "+++ (getAttribute %s) -> %s"
+                          attr-name
+                          res))
+        res))
+    (catch Exception x
+      (do
+        (.println System/out (str "ops" x))
+        (throw x)))))
+
+(defn get-attributes [attr-names attrs]
+  (.println System/out (format "getAttributes %s" (vec attr-names)))
+  (let [result (javax.management.AttributeList.)]
+    (dorun
+     (for [attr-name attr-names
+           :let [state (attrs attr-name)
+                 v (pr-str @state)]]
+       (do 
+         (.println System/out (format "state = %s value = %s" state v))
+         (.add result ^Object (pr-str @state)))))
+    result))
+
+;; Creates a DynamicMBean
+;; Exceptions are logged and mapped
 (defn make-mbean [mbean-description & states]
   (let [attrs (zipmap (map name-of states) states)]
     (.println System/out (format "attrs = %s" attrs))
     (reify javax.management.DynamicMBean
       (getMBeanInfo [this]
-        (javax.management.MBeanInfo.
-         "class name ignored"
-         (name mbean-description)
-         (into-array
-          (map #(make-mbean-attribute-info %) states))
-         nil ;; no constructors
-         nil ;; no operations
-         nil)) ;; no notifications
-      
+        (make-mbean-info this (str mbean-description) states))
+
       (setAttribute [this attr]
-        (let [a-str (.getValue attr)
-              state (attrs (.getName attr))
-              fmt "+++ Setting JMX attribute '%s' (reference %s meta=%s) to [%s] (%s)"
-              arg (read-string a-str)]
-          (.println System/out (format fmt 
-                                       (.getName attr)
-                                       state (meta state)
-                                       arg (class arg)))
-          (try
-            ;; may fail due to validation!
-            ;; watches??
-            (set-value state arg)
-            (catch Exception x
-              (.println System/out (format (str fmt " FAILS [%s]")
-                                           (.getName attr)
-                                           state (meta state)
-                                           arg (class arg)
-                                           x))
-              (throw (doto (RuntimeException. (str x))
-                       (.setStackTrace (.getStackTrace x))))))))
+        (with-exception-mapping "(setAttribute %s)" [attr]
+          (set-attribute this attr attrs)))
       
-      (getAttribute [_ attr-name]
-        (.println System/out (format "(getAttribute %s)" attr-name))
-        (let [res (pr-str @(attrs attr-name))]
-          (.println System/out (format "(getAttribute %s) -> %s" attr-name res))
-          res))
+      (getAttribute [this attr-name]
+        (with-exception-mapping "(getAttribute %s)" [attr-name]
+          (get-attribute attr-name attrs)))
       
-      (getAttributes [_ attr-names]
-        (.println System/out (format "getAttributes %s" (vec attr-names)))
-        (let [result (javax.management.AttributeList.)]
-          (dorun
-           (for [attr-name attr-names
-                 :let [state (attrs attr-name)
-                       v (pr-str @state)]]
-             (do 
-               (.println System/out (format "state = %s value = %s" state v))
-               (.add result ^Object (pr-str @state)))))
-          result)))))
+      (getAttributes [this attr-names]
+        (with-exception-mapping "(getAttributes %s)" [attr-names]
+          (get-attributes attr-names attrs))))))
 
 ;; -------------------------------------------------------------------
 ;; JMX Operation
