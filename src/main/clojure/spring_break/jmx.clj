@@ -3,10 +3,10 @@
            [spring-break.core :as core]))
 
 ;; A JMX client
-(defn -main [mbean a-str & {:keys [port host meth]
-                            :or {port 9999
-                                 host "127.0.0.1"
-                                 meth :parseObject}}]
+(defn -invoke [mbean a-str & {:keys [port host meth]
+                              :or {port 9999
+                                   host "127.0.0.1"
+                                   meth :parseObject}}]
   (jmx/with-connection {:host host :port port}
     (core/log "Calling %s on %s with '%s' returns '%s'"
               meth
@@ -14,9 +14,21 @@
               a-str
               (jmx/invoke mbean meth a-str))))
 
+(defn -read [attr-name & {:keys [port host mbean-name]
+                          :or {port 9999
+                               host "127.0.0.1"
+                               mbean-name "clojure-beans:name=clj_states"}}]
+  (jmx/with-connection {:host host :port port}
+    (core/log "Getting attribute value of %s returns '%s'"
+              attr-name
+              ;;(jmx/mbean-names "*:*"))))
+              ;;(vec (jmx/attribute-names "clojure-beans:name=clj_states")))))
+              ;;(jmx/read "clojure-beans:name=clj_states" (keyword :an_atom)))))
+              (jmx/read mbean-name attr-name))))
+
 ;; Just a helper that delivers a var with meta
 ;; How do you do this with out a namespace entry?
-(def ^{:attr-name ":a_var" :description "some description"} a-var)
+(def ^{:attr-name "a_var" :description "some description"} a-var)
 (defn get-a-var []
   #'a-var)
 
