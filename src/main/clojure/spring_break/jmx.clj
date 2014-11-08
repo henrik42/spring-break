@@ -1,16 +1,24 @@
 (ns spring-break.jmx
-  (require [clojure.java.jmx :as jmx]))
+  (require [clojure.java.jmx :as jmx]
+           [spring-break.core :as core]))
 
 ;; A JMX client
 (defn -main [mbean a-str & {:keys [port host meth]
-                            :or {port 9999 host "127.0.0.1" meth :parseObject}}]
+                            :or {port 9999
+                                 host "127.0.0.1"
+                                 meth :parseObject}}]
   (jmx/with-connection {:host host :port port}
-    (.println System/out
-              (format "+++ Calling %s on %s with '%s' returns '%s'"
-                      meth
-                      mbean
-                      a-str
-                      (jmx/invoke mbean meth a-str)))))
+    (core/log "Calling %s on %s with '%s' returns '%s'"
+              meth
+              mbean
+              a-str
+              (jmx/invoke mbean meth a-str))))
+
+;; Just a helper that delivers a var with meta
+;; How do you do this with out a namespace entry?
+(def ^{:attr-name ":a_var" :description "some description"} a-var)
+(defn get-a-var []
+  #'a-var)
 
 ;; -------------------------------------------------------------------
 ;; Methods/functions called by JMX may throw exceptions which
@@ -46,6 +54,17 @@
     (catch Throwable t#
       (with-exception-mapping* ~fmt ~args t#))))
 
+;; parses the input and returns the value that
+;; will be further processed. This value will be
+;; passed to functions (JMX operation) and
+;; or be the value for state changes (JMX attributes)
+;; Not-using eval allows you to process plain forms without
+;; evaluation. If you want the evaluated <form>, use input
+;; #=(eval <form>)
+(defn make-value-from-input [input]
+  ;;(eval (read-string input)))
+  (read-string input))
+
 ;; -------------------------------------------------------------------
 ;; JMX Attribute
 ;; -------------------------------------------------------------------
@@ -57,6 +76,8 @@
 (defmethod set-value clojure.lang.Ref [a-ref v]
   (dosync 
    (ref-set a-ref v)))
+(defmethod set-value clojure.lang.Var [a-var v]
+  (alter-var-root a-var (constantly v)))
 
 ;; fake getter for JMX - not called but reflected on by JMX
 ;; Must return a method "String <meth>()".
@@ -73,7 +94,9 @@
                   (into-array [String]))))
 
 (defn name-of [state]
-  (:name (meta state)))
+  (or (:attr-name (meta state))
+      (throw (RuntimeException.
+              (format "oops: %s %s" (pr-str state) (meta state))))))
 
 (defn description-of [state]
   (:description (meta state)))
@@ -97,60 +120,37 @@
    nil ;; no operations
    nil)) ;; no notifications
 
-(defn set-attribute [mbean attr attrs]
-  (let [a-str (.getValue attr)
-        state (or (attrs (.getName attr))
-                  (let [msg (format "+++ State %s not found. Known states are %s." attr attrs)]
-                    (.println System/out msg)
-                    (throw (RuntimeException. msg))))
-        fmt "+++ Setting JMX attribute '%s' (%s meta=%s) \nto [%s] (%s)"
-        arg (try
-              (read-string a-str)
-              (catch Exception x
-                (let [msg (format (str fmt "\nread-string FAILS [%s]")
-                                  (.getName attr)
-                                  state (meta state)
-                                  a-str (class a-str)
-                                  x)]
-                  (.println System/out msg)
-                  (throw (doto (RuntimeException. msg)
-                           (.setStackTrace (.getStackTrace x)))))))]
-    (.println System/out (format fmt 
-                                 (.getName attr)
-                                 state (meta state)
-                                 arg (class arg)))
-    (try
-      ;; may fail due to validation!
-      (set-value state arg)
-      (catch Exception x
-        (let [msg (format (str fmt "\nFAILS [%s]")
-                          (.getName attr)
-                          state (meta state)
-                          arg (class arg)
-                          x)]
-          (.println System/out msg)
-          (throw (doto (RuntimeException. msg)
-                   (.setStackTrace (.getStackTrace x)))))))))
+(defn set-attribute [attr attrs]
+  (core/log "(setAttribute %s %s) called"
+            (pr-str attr)
+            attrs)
+  (let [attr-name (.getName attr)
+        state (or (attrs attr-name)
+                  (throw (IllegalArgumentException.
+                          (format "Unknown attribute '%s'"
+                                  attr-name))))
+        new-value (make-value-from-input (.getValue attr))]
+    (set-value state new-value)))
 
 (defn get-attribute [attr-name attrs]
-  (.println System/out (format "+++ (getAttribute %s %s) called"
-                               (pr-str attr-name)
-                               attrs))
+  (core/log "(getAttribute %s %s) called"
+            (pr-str attr-name)
+            attrs)
   (let [state (or (attrs attr-name)
                   (throw (IllegalArgumentException.
                           (format "Unknown attribute '%s'"
                                   attr-name))))
         res (pr-str @state)]
-    (.println System/out (format "+++ (getAttribute %s %s) returns %s"
-                                 (pr-str attr-name)
-                                 attrs
-                                 (pr-str res)))
+    (core/log "(getAttribute %s %s) returns %s"
+              (pr-str attr-name)
+              attrs
+              (pr-str res))
     res))
 
 (defn get-attributes [attr-names attrs]
-  (.println System/out (format "+++ (getAttributes %s %s) called"
-                               (vec attr-names)
-                               attrs))
+  (core/log "(getAttributes %s %s) called"
+            (vec attr-names)
+            attrs)
   (let [result (javax.management.AttributeList.)]
     (dorun
      (for [attr-name attr-names
@@ -160,10 +160,10 @@
                                            attr-name))))
                  attr-value (pr-str @state)]]
        (.add result ^Object attr-value)))
-    (.println System/out (format "+++ (getAttributes %s %s) returns %s"
-                                 (vec attr-names)
-                                 attrs
-                                 (pr-str result)))
+    (core/log "(getAttributes %s %s) returns %s"
+              (vec attr-names)
+              attrs
+              (pr-str result))
     result))
 
 ;; Creates a DynamicMBean
@@ -177,8 +177,8 @@
 
       ;; called via JMX
       (setAttribute [this attr]
-        (with-exception-mapping "(setAttribute %s %s %s)" [this attr attrs]
-          (set-attribute this attr attrs)))
+        (with-exception-mapping "(setAttribute %s %s)" [attr attrs]
+          (set-attribute attr attrs)))
       
       ;; called via JMX
       (getAttribute [this attr-name]
@@ -200,10 +200,9 @@
   (proxy [java.text.Format][] 
     (toString [] (format "(fn-wrapper-of %s meta=%s)" a-fn (meta a-fn)))
     (parseObject [a-str]
-      (let [fmt "+++ Calling (%s [meta=%s] %s)"
-            arg (read-string (format "[%s]" a-str))
-            _ (.println System/out (format fmt 
-                                           a-fn (meta a-fn) a-str))
+      (let [fmt "Calling (%s [meta=%s] %s)"
+            arg (make-value-from-input (format "[%s]" a-str))
+            _ (core/log fmt a-fn (meta a-fn) a-str)
             res (try
                   (apply a-fn arg)
                   (catch Exception x
@@ -211,13 +210,13 @@
                     ;; deserializable at remote JMX client sites
                     ;; (e.g. Clojure ArityExceptions wouldn't usually be)
                     ;; TODO: recure down the cause chain and convert those too
-                    (.println System/out (format (str fmt " FAILS [%s]")
-                                                 a-fn (meta a-fn) a-str x))
+                    (core/log (str fmt " FAILS [%s]")
+                              a-fn (meta a-fn) a-str x)
                     (throw (doto (RuntimeException. (str x))
                              (.setStackTrace (.getStackTrace x))))))
             res-str (pr-str res)]
-        (.println System/out (format (str fmt " RETURNS [%s]")
-                                     a-fn (meta a-fn) a-str res-str))
+        (core/log (str fmt " RETURNS [%s]")
+                  a-fn (meta a-fn) a-str res-str)
         res-str))))
 
 ;; for JMX operations/Clojure functions
@@ -240,10 +239,8 @@
 
 ;; will only be used for JMX operations/Clojure functions - not JMX attributes
 (defn make-model-mbean-info [bean-obj bean-name]
-  (.println System/out
-            (format
-             "+++ making model-mbean-info for bean-obj = %s"
-             bean-obj))
+  (core/log "making model-mbean-info for bean-obj = %s"
+            bean-obj)
   (javax.management.modelmbean.ModelMBeanInfoSupport.
    "classname ignored!"
    "description ignored"
@@ -262,9 +259,9 @@
     (includeBean [bean-class bean-name]
       ;; bean-class will be java.lang.Object for factory-generated beans
       (let [incl? (pred bean-name)]
-        (.println System/out (format "+++ includeBean class=[%s] id=[%s] RETURNS %s" bean-class bean-name incl?))
+        (core/log "includeBean class=[%s] id=[%s] RETURNS %s" bean-class bean-name incl?)
         incl?))
     ;; will only be used for JMX operations/Clojure functions - not JMX attributes
     (getMBeanInfo [bean-obj bean-name] ;; returns javax.management.modelmbean.ModelMBeanInfo
-      (.println System/out (format "+++ assembling JMX operation bean=[%s] id=[%s]" bean-obj bean-name))
+      (core/log "assembling JMX operation bean=[%s] id=[%s]" bean-obj bean-name)
       (make-model-mbean-info bean-obj bean-name))))

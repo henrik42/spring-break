@@ -30,43 +30,35 @@
     </property>
   </bean>
 
-  <bean id="run_swank" 
-	parent="clojure_fact">
-    <constructor-arg 
-	value='
-	       (ns user
-	         (:use swank.swank))
-	       (println "+++ Starting swank server")
-	       (future 
-	           (start-server :port 4007))
-	       ' />
-  </bean>
-
-  <bean id="clj_state" parent="clojure_fact">
+  <bean name="clj_states" parent="clojure_fact">
     <constructor-arg value="
     (require 'spring-break.jmx)
     (spring-break.jmx/make-mbean 
-      :my_mbean
+      :my_mbean #_ description
       (atom 42 
         :validator number? 
-	:meta {:name (str :an_atom) 
+	:meta {:attr-name (str :an_atom) 
+	:description (name :a_description) })
+      (spring-break.jmx/get-a-var)
+      (ref (str 'ref)
+        :validator string? 
+	:meta {:attr-name (str :a_ref) 
 	       :description (name :a_description) }))
-    #_ (spring-break.jmx/make-mbean (atom 42 :validator number?))
-    #_ (spring-break.jmx/make-mbean (ref 42 :validator number?))
     " />
   </bean>
 
-  <bean id="_clj_echo" parent="clojure_fact">
+  <bean id="clj_echo" parent="clojure_fact">
     <constructor-arg value="
     (require 'spring-break.jmx)
     (spring-break.jmx/fn-wrapper-of ^{:info :echo} (fn [a] a))
     " />
   </bean>
 
-  <bean id="_clj_swap" parent="clojure_fact">
+  <bean id="clj_eval" parent="clojure_fact">
+    <!-- See comments at spring-break.jmx/make-value-from-input -->
     <constructor-arg value="
     (require 'spring-break.jmx)
-    (spring-break.jmx/fn-wrapper-of ^{:info :swap} (fn [a b] [b a]))
+    (spring-break.jmx/fn-wrapper-of ^{:info :eval} (fn [a] (eval a)))
     " />
   </bean>
 
