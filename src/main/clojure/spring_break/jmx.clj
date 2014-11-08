@@ -32,14 +32,19 @@
 ;; fmt and args will become part of the mapped
 ;; exception. Use them to add context to the
 ;; exception message
+(defn with-exception-mapping* [fmt args t]
+  (let [msg (apply format
+                   (str fmt " failed due to: %s")
+                   (concat (map pr-str args) [t]))
+        x (RuntimeException. msg t)]
+    (.printStackTrace x System/err)
+    (throw (copy-exception-chain x))))
+
 (defmacro with-exception-mapping [fmt args & body]
   `(try
     ~@body
     (catch Throwable t#
-      (let [msg# (apply format (str ~fmt " FAILED: %s") ~@args [t#])
-            x# (RuntimeException. msg# t#)]
-        (.printStackTrace x# System/err)
-        (throw (copy-exception-chain x#))))))
+      (with-exception-mapping* ~fmt ~args t#))))
 
 ;; -------------------------------------------------------------------
 ;; JMX Attribute
@@ -128,13 +133,18 @@
                    (.setStackTrace (.getStackTrace x)))))))))
 
 (defn get-attribute [attr-name attrs]
-  (.println System/out (format "+++ (getAttribute %s %s) called" attr-name attrs))
+  (.println System/out (format "+++ (getAttribute %s %s) called"
+                               (pr-str attr-name)
+                               attrs))
   (let [state (or (attrs attr-name)
                   (throw (IllegalArgumentException.
                           (format "Unknown attribute '%s'"
                                   attr-name))))
         res (pr-str @state)]
-    (.println System/out (format "+++ (getAttribute %s %s) returns %s" attr-name attrs res))
+    (.println System/out (format "+++ (getAttribute %s %s) returns %s"
+                                 (pr-str attr-name)
+                                 attrs
+                                 (pr-str res)))
     res))
 
 (defn get-attributes [attr-names attrs]
@@ -146,13 +156,14 @@
      (for [attr-name attr-names
            :let [state (or (attrs attr-name)
                            (throw (IllegalArgumentException.
-                                   (format "Unknown attribute %s"
+                                   (format "Unknown attribute '%s'"
                                            attr-name))))
                  attr-value (pr-str @state)]]
        (.add result ^Object attr-value)))
     (.println System/out (format "+++ (getAttributes %s %s) returns %s"
                                  (vec attr-names)
-                                 attrs result))
+                                 attrs
+                                 (pr-str result)))
     result))
 
 ;; Creates a DynamicMBean
@@ -176,7 +187,7 @@
       
       ;; called via JMX
       (getAttributes [this attr-names]
-        (with-exception-mapping "(getAttributes %s %s)" [attr-names attrs]
+        (with-exception-mapping "(getAttributes %s %s)" [(vec attr-names) attrs]
           (get-attributes attr-names attrs))))))
 
 ;; -------------------------------------------------------------------
@@ -241,9 +252,13 @@
    (into-array [(make-model-mbean-operation-info)])
    (into-array javax.management.modelmbean.ModelMBeanNotificationInfo [])))
 
+;; -------------------------------------------------------------------
+;; Spring integration
+;; -------------------------------------------------------------------
+
 ;; will be used for bean selection and registration of JMX operations/Clojure functions
 (defn mbean-info-assembler [pred]
-  (proxy [org.springframework.jmx.export.assembler.AutodetectCapableMBeanInfoAssembler][]
+  (proxy [org.springframework.jmx.export.assembler.AutodetectCapableMBeanInfoAssembler] []
     (includeBean [bean-class bean-name]
       ;; bean-class will be java.lang.Object for factory-generated beans
       (let [incl? (pred bean-name)]
