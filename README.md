@@ -1364,12 +1364,12 @@ MBean which in turn publishes Clojure's ```atom```, ```ref``` and
 		  (atom 42 
 			:validator number? 
 		    :meta {:attr-name (name :an_atom) 
-		           :description (name :a_description) })
+		           :attr-description (name :a_description) })
 		  (spring-break.jmx/get-a-var)
 		  (ref (str 'ref)
 			:validator string? 
 		    :meta {:attr-name (name :a_ref) 
-			       :description (name :a_description) }))
+			       :attr-description (name :a_description) }))
 		" />
 	  </bean>
 
