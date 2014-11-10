@@ -3,32 +3,51 @@
            [spring-break.core :as core]))
 
 ;; A JMX client
-(defn -invoke [mbean a-str & {:keys [port host meth]
-                              :or {port 9999
-                                   host "127.0.0.1"
-                                   meth :parseObject}}]
+;; For experimenting - not for being called as an API
+;; strs-keys because we'll be calling via lein and
+;; so args are all strings.
+(defn jmx-invoke [mbean arg & {:strs [port host meth]
+                               :or {port 9999
+                                    host "127.0.0.1"
+                                    meth :parseObject}}]
   (jmx/with-connection {:host host :port port}
     (core/log "Calling %s on %s with '%s' returns '%s'"
               meth
               mbean
-              a-str
-              (jmx/invoke mbean meth a-str))))
+              arg
+              (jmx/invoke mbean meth (str arg)))))
 
-(defn -read [attr-name & {:keys [port host mbean-name]
-                          :or {port 9999
-                               host "127.0.0.1"
-                               mbean-name "clojure-beans:name=clj_states"}}]
+(defn jmx-read [attr-name & {:strs [port host mbean-name]
+                             :or {port 9999
+                                  host "127.0.0.1"
+                                  mbean-name "clojure-beans:name=clj_states"}}]
   (jmx/with-connection {:host host :port port}
     (core/log "Getting attribute value of %s returns '%s'"
               attr-name
-              ;;(jmx/mbean-names "*:*"))))
-              ;;(vec (jmx/attribute-names "clojure-beans:name=clj_states")))))
-              ;;(jmx/read "clojure-beans:name=clj_states" (keyword :an_atom)))))
               (jmx/read mbean-name attr-name))))
+
+(defn jmx-write [attr-name attr-value
+                 & {:strs [port host mbean-name]
+                    :or {port 9999
+                         host "127.0.0.1"
+                         mbean-name "clojure-beans:name=clj_states"}}]
+  (jmx/with-connection {:host host :port port}
+    (core/log "Setting attribute value of %s to '%s'"
+              attr-name attr-value)
+    (jmx/write! mbean-name attr-name (str attr-value))))
+
+;; So that we can call lein -m <namespace> (invoke|read|write) [...]
+(defn -main [f & args]
+  (cond
+    (= "invoke" f) (apply jmx-invoke args)
+    (= "read" f) (apply jmx-read args)
+    (= "write" f) (apply jmx-write args)
+    :else (throw (IllegalArgumentException.
+                  (format "Neither :read/:invoke : %s" f)))))
 
 ;; Just a helper that delivers a var with meta
 ;; How do you do this with out a namespace entry?
-(def ^{:attr-name "a_var" :description "some description"} a-var)
+(def ^{:attr-name "a_var" :attr-description "a var description"} a-var)
 (defn get-a-var []
   #'a-var)
 
@@ -91,14 +110,14 @@
 (defmethod set-value clojure.lang.Var [a-var v]
   (alter-var-root a-var (constantly v)))
 
-;; fake getter for JMX - not called but reflected on by JMX
+;; fake getter for JMX - not called but reflected upon by JMX
 ;; Must return a method "String <meth>()".
 (def fake-getter
   (-> Class
       (.getMethod "getCanonicalName"
                   (into-array Class []))))
 
-;; fake setter for JMX - not called but reflected on by JMX
+;; fake setter for JMX - not called but reflected upon by JMX
 ;; Must return a method "<type> <meth>(String)".
 (def fake-setter
   (-> Class
@@ -111,9 +130,9 @@
               (format "oops: %s %s" (pr-str state) (meta state))))))
 
 (defn description-of [state]
-  (:description (meta state)))
+  (:attr-description (meta state)))
 
-;; called from Spring not JMX
+;; called from Spring -- not JMX
 (defn make-mbean-attribute-info [state]
   (javax.management.MBeanAttributeInfo.
    (name-of state)
@@ -121,7 +140,7 @@
    fake-getter
    fake-setter))
 
-;; called from Spring not JMX
+;; called from Spring -- not JMX
 (defn make-mbean-info [mbean ^String mbean-description states]
   (javax.management.MBeanInfo.
    (str (class mbean)) ;; doesn't matter
@@ -209,27 +228,15 @@
 ;; Proxy/wrapper around a Clojure function - this will be passed
 ;; to (make-model-mbean-info)
 (defn fn-wrapper-of [a-fn]
-  (proxy [java.text.Format][] 
+  (proxy [java.text.Format] [] 
     (toString [] (format "(fn-wrapper-of %s meta=%s)" a-fn (meta a-fn)))
     (parseObject [a-str]
-      (let [fmt "Calling (%s [meta=%s] %s)"
-            arg (make-value-from-input (format "[%s]" a-str))
-            _ (core/log fmt a-fn (meta a-fn) a-str)
-            res (try
-                  (apply a-fn arg)
-                  (catch Exception x
-                    ;; convert into a type/class that will be
-                    ;; deserializable at remote JMX client sites
-                    ;; (e.g. Clojure ArityExceptions wouldn't usually be)
-                    ;; TODO: recure down the cause chain and convert those too
-                    (core/log (str fmt " FAILS [%s]")
-                              a-fn (meta a-fn) a-str x)
-                    (throw (doto (RuntimeException. (str x))
-                             (.setStackTrace (.getStackTrace x))))))
-            res-str (pr-str res)]
-        (core/log (str fmt " RETURNS [%s]")
-                  a-fn (meta a-fn) a-str res-str)
-        res-str))))
+      (with-exception-mapping "Calling %s with [%s]" [a-fn a-str]
+        (let [arg (make-value-from-input (format "[%s]" a-str))
+              _ (core/log "Calling %s with %s" a-fn arg)
+              res (pr-str (apply a-fn arg))]
+          (core/log "Calling %s with %s returns %s" a-fn arg res)
+          res)))))
 
 ;; for JMX operations/Clojure functions
 (defn make-mbean-parameter-info []

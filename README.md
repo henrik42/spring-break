@@ -1139,21 +1139,23 @@ And run:
 
 Spring lets you register any Spring bean with a JMX MBeanServer (see
 the Spring documentation for details). Here I want to show how to
-register **Clojure functions as JMX operations**. This lets you call
-any of those funtions via *jconsole* (or any other JMX client).
+register **Clojure functions as JMX operations** and **Clojure's
+mutable reference types (refs, atoms, vars) as JMX attribute**. This
+lets you call any of those funtions and change mutable state via
+*jconsole* (or any other JMX client, e.g. ```org.clojure/java.jmx```).
 
 ## MBeanExporter
 
 The ```org.springframework.jmx.export.MBeanExporter``` will *drive*
 the registration/publishing. It iterates over all beans and calls-back
-on our Clojure-based ```mbean-info-assembler``` (nested Spring bean)
-which delivers the *JMX view of the published beans*
-(```javax.management.modelmbean.ModelMBeanInfoSupport```; see
-below). In this example we will publish any bean whose name 
-matches ```#"clj_.*"```. Each function will be published with a
-JMX ```ObjectName``` of ```(format "clojure-beans:name=%s" bean-key)```
-(see ```namingStrategy```). This will show-up in *jconsole* as the
-MBean name.
+on our Clojure-based ```mbean-info-assembler``` (nested Spring bean).
+
+In this example we will publish any bean whose name matches
+```#"clj_.*"``` to JMX.
+
+Each bean will be published with a JMX ```ObjectName``` of ```(format
+"clojure-beans:name=%s" bean-key)``` (see ```namingStrategy```). This
+will show-up in *jconsole* as the MBean name.
 
 	<bean id="exporter" class="org.springframework.jmx.export.MBeanExporter">
 
@@ -1186,12 +1188,15 @@ The ```mbean-info-assembler``` serves two purposes:
 (1) It decides which beans will be *included*/published (via the
 passed-in ```pred```)
 
-(2) It delivers the *JMX view* of the *included bean*
+(2) For functons it delivers the *JMX view* of the *included
+bean*. For the reference types the bean itself is a
+```javax.management.DynamicMBean``` which will be published as is to
+JMX by Spring.
 
 Here's the code: (more details below)
 
 	(defn mbean-info-assembler [pred]
-	  (proxy [org.springframework.jmx.export.assembler.AutodetectCapableMBeanInfoAssembler][]
+	  (proxy [org.springframework.jmx.export.assembler.AutodetectCapableMBeanInfoAssembler] []
 		(includeBean [bean-class bean-name]
 		  (let [incl? (pred bean-name)]
 			incl?))
@@ -1205,7 +1210,7 @@ Now we can define the first *Clojure function JMX bean*:
 	  <bean id="clj_echo" parent="clojure_fact">
 		<constructor-arg value="
 		(require 'spring-break.jmx)
-		(spring-break.jmx/fn-wrapper-of (fn [a] a))
+		(spring-break.jmx/fn-wrapper-of ^{:info :echo} (fn [a] a))
 		" />
 	  </bean>
 
@@ -1216,19 +1221,17 @@ and create the *JMX view* via ```fn-wrapper-of```.
 
 ## spring-break.jmx/fn-wrapper-of
 
+**TODO: change this to ```make-mbean``` as for JMX attributes**
+
 The relevant part of the code looks like this:
 
 	(defn fn-wrapper-of [a-fn]
-	  (proxy [java.text.Format][]
+	  (proxy [java.text.Format] [] 
 		(parseObject [a-str]
-		  (let [arg (read-string (format "[%s]" a-str))
-				res (try
-					  (apply a-fn arg)
-					  (catch Exception x
-						(throw (doto (RuntimeException. (str x))
-								 (.setStackTrace (.getStackTrace x))))))
-				res-str (pr-str res)]
-			res-str))))
+		  (with-exception-mapping "Calling %s with [%s]" [a-fn a-str]
+			(let [arg (make-value-from-input (format "[%s]" a-str))
+				  res (pr-str (apply a-fn arg))]
+			  res)))))
 
 There are some things to note:
 
@@ -1262,19 +1265,18 @@ There are some things to note:
 
 * Your function's returned value will be deserialized over to a remote
   calling client. In order to prevent classloading problems the
-  *wrapper method* will transform the returned value 
-  via ```(pr-str)``` into a ```String```. If your function throws 
-  an ```Exception``` the *wrapper method* will create and throw 
-  a ```RuntimeException``` instead and copy the 
-  original ```Exception```'s stacktrace into that. This way you lose the
-  exception type but you still get the stacktrace.
+  *wrapper method* transforms the returned value via ```(pr-str)```
+  into a ```String```. If your function throws an ```Exception``` the
+  *wrapper method* will create and throw a ```RuntimeException```
+  instead and copy the original ```Exception```'s stacktrace into that
+  (it actually copies the complete **exception cause-chain** that
+  way). So you'll lose the exception's concrete type but you still get
+  the stacktrace and message.
 
   In the end a remote calling client will either receive 
   a ```java.lang.String``` (as of ```(pr-str)```) or 
   a ```RuntimeException``` both of which can be deserialized in any
   case.
-
-  **TODO: copy cause-chain**
 
 * In order for JMX to be able to call the *wrapper method* it has to
   be a *named method* of the form ```<some-type>
@@ -1307,6 +1309,10 @@ submit via ```parseObject``` button. The returned value should
 be ```(+ 1 2)``` (hence the name of this bean ;-) Now try ```#=(+ 1
 2)```. This should give you ```3```.
 
+Note that the Clojure-app will print log messages to the console.
+
+Try using the JMX bean ```clj_eval```.
+
 ## Calling JMX operation remotely via clojure.java.jmx/invoke
 
 In the example above we connected locally to the JVM. Now we want to
@@ -1332,16 +1338,73 @@ or:
 
 Now you can run the client:
 
-	lein run -m spring-break.jmx clojure-beans:name=clj_echo "#=(rand)"
-
+	lein run -m spring-break.jmx invoke clojure-beans:name=clj_echo "#=(rand)"
+	
 or:
 
     CP=$(JAVA_CMD=`which java` lein classpath)
-    java -cp ${CP} clojure.main -m spring-break.jmx clojure-beans:name=clj_echo "#=(rand)"
+    java -cp ${CP} clojure.main -m spring-break.jmx invoke clojure-beans:name=clj_echo "#=(rand)"
 
 And for just playing around:
 
-	java -cp ${CP} clojure.main -e "(use 'spring-break.jmx) (-main \"clojure-beans:name=clj_echo\" \"#=(+ 1 2)\")"
+	java -cp ${CP} clojure.main -e "(use 'spring-break.jmx) (jmx-invoke \"clojure-beans:name=clj_echo\" \"#=(+ 1 2)\")"
+
+## Changing mutable state (references) via JMX attributes
+
+When Spring detects a bean that is a JMX MBean it will publish it to
+JMX. ```spring-break.jmx/make-mbean``` may be used to create such an
+MBean which in turn publishes Clojure's ```atom```, ```ref``` and
+```var``` as mutable/*settable* JMX attributes.
+
+	  <bean name="clj_states" parent="clojure_fact">
+		<constructor-arg value="
+		(require 'spring-break.jmx)
+		(spring-break.jmx/make-mbean 
+		  :my_mbean #_ description
+		  (atom 42 
+			:validator number? 
+		    :meta {:attr-name (name :an_atom) 
+		           :description (name :a_description) })
+		  (spring-break.jmx/get-a-var)
+		  (ref (str 'ref)
+			:validator string? 
+		    :meta {:attr-name (name :a_ref) 
+			       :description (name :a_description) }))
+		" />
+	  </bean>
+
+Again exceptions are mapped/copied to circumvent problems with
+deserialization:
+
+	(defn make-mbean [mbean-description & states]
+	  (let [attrs (zipmap (map name-of states) states)]
+		(reify javax.management.DynamicMBean
+		  (getMBeanInfo [this]
+			(make-mbean-info this (str mbean-description) states))
+		  (setAttribute [this attr]
+			(with-exception-mapping "(setAttribute %s %s)" [attr attrs]
+			  (set-attribute attr attrs)))
+		  (getAttribute [this attr-name]
+			(with-exception-mapping "(getAttribute %s %s)" [attr-name attrs]
+			  (get-attribute attr-name attrs)))
+		  (getAttributes [this attr-names]
+			(with-exception-mapping "(getAttributes %s %s)" [(vec attr-names) attrs]
+			  (get-attributes attr-names attrs))))))
+
+Now read a value:
+
+	lein run -m spring-break.jmx read an_atom
+	java -cp ${CP} clojure.main -m spring-break.jmx read an_atom
+
+And write it:
+
+	java -cp ${CP} clojure.main -m spring-break.jmx write an_atom 21
+	java -cp ${CP} clojure.main -m spring-break.jmx write a_ref \"foo\"	
+	java -cp ${CP} clojure.main -m spring-break.jmx write a_var :foobar
+
+Now try the validators:
+
+	lein run -m spring-break.jmx write a_ref 1
 
 # More to come
 
