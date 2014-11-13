@@ -62,4 +62,31 @@
     " />
   </bean>
 
+  <bean id="close_sac_factory" 
+	parent="clojure_fact">
+    <constructor-arg value="
+      (require 'spring-break.jmx)
+      (let [sac (atom nil)]
+	  (reify 
+	    org.springframework.context.ApplicationContextAware
+	    java.util.concurrent.Callable
+	    (setApplicationContext [this v] 
+	      (swap! sac (constantly v)))
+	    (call [this]
+	      (spring-break.jmx/fn-wrapper-of ^{:info :close-sac}
+	        (fn [arg]
+		  (.close @sac))))))
+      " />
+  </bean>
+
+  <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer" 
+    id="pull_in_clojure_beans"
+    depends-on="clj_close_sac">
+    <property name="placeholderPrefix" value="$$$do-not-use$$$" />
+  </bean>
+
+  <bean id="clj_close_sac" 
+	factory-bean="close_sac_factory"
+	factory-method="call" />
+
 </beans>
