@@ -28,6 +28,6 @@
     (if (System/getProperty "wait-for-sac-close")
       (do
         (log "Waiting for Spring application context shuttdown ...")
-        @(promise))
+        @closed)
       (.close sac))
     (log "done.")))
