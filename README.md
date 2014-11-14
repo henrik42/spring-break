@@ -915,7 +915,7 @@ and ```resources/spring-config-lifecycle.xml```:
 
 And run:
 
-	lein spring-config-lifecycle.xml some_bean
+	lein run spring-config-lifecycle.xml some_bean
 	
 ## Construction
 
