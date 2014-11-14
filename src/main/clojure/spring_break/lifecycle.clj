@@ -1,4 +1,5 @@
-(ns spring-break.lifecycle)
+(ns spring-break.lifecycle
+    (:require [spring-break.core :as core]))
 
 (defprotocol some-bean-java-bean
   (setFoo [this v])
@@ -16,22 +17,29 @@
       
       (setFoo [this v]
         (swap! state assoc :foo v)
-        (printf "+++ after setFoo : %s\n" this))
+        (core/log "after setFoo : %s" this))
       (setBar [this v]
         (swap! state assoc :bar v)
-        (printf "+++ after setBar : %s\n" this))
+        (core/log "after setBar : %s" this))
       
       ;; org.springframework.beans.factory.InitializingBean
-      (afterPropertiesSet [this] (printf "+++ afterPropertiesSet : %s\n" this))
+      (afterPropertiesSet [this] (core/log "afterPropertiesSet : %s" this))
 
       ;; org.springframework.beans.factory.DisposableBean
-      (destroy [this] (printf "+++ destroy : %s\n" this))
+      (destroy [this] (core/log "destroy : %s" this))
 
       ;; org.springframework.context.SmartLifecycle
       (getPhase [this] 0)
-      (isAutoStartup [this] (printf "+++ isAutoStartup : %s\n" this) true)
-      (isRunning [this] (printf "+++ isRunning : %s\n" this) true)
-      (start [this] (printf "+++ start : %s\n" this))
-      (stop [this runnable] (printf "+++ stop : %s\n" this) (.run runnable))
-      )))
+      (isAutoStartup [this]
+        (core/log "isAutoStartup : %s" this)
+        true)
+      (isRunning [this]
+        (core/log "isRunning : %s" this)
+        (boolean (:running @state)))
+      (start [this]
+        (core/log "start : %s" this)
+        (swap! state assoc :running true))
+      (stop [this runnable]
+        (core/log "stop : %s" this)
+        (.run runnable)))))
 
