@@ -89,4 +89,13 @@
 	factory-bean="close_sac_factory"
 	factory-method="call" />
 
+  <bean id="run_swank_server" 
+	parent="clojure_fact">
+    <constructor-arg 
+	value="
+	  (require 'spring-break.swank)
+	  (spring-break.swank/swank-starter)
+	  " />
+  </bean>
+
 </beans>
