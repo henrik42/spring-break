@@ -140,8 +140,10 @@ This is the relevant part of the *driver* code:
 				bean
 				(when bean (.getClass bean)))))
 		(if (System/getProperty "wait-for-sac-close")
-		  @(promise)
-		  (.close sac))))
+		  @closed
+		  (.close sac))
+		(when (System/getProperty "do-system-exit-0")
+		  (System/exit 0))))
 
 * The driver has a *tool-app* part (within the ```(dorun)```).
 
@@ -172,6 +174,19 @@ print-functions because they use ```clojure.core/*out*``` which is a
 and Java stuff (Spring!) at the same time. So in order to see the
 Clojure-output in sync with the Java-output we shouldn't buffer either
 of them.
+
+### Beware of non-daemon threads
+
+The *driver* from above will run the main thread to completion. If
+this was the only non-daemon thread the JVM would exit after this. But
+there may be cases when the *business code* (i.e. Spring beans) starts
+non-daemon threads (like swank and Clojure's agent threadpool). These
+have to be shut-down when the Spring application context is shut-down.
+
+Below you find some examples for this. If you want to make sure your
+application exists even if you're using *mis-behaved* Spring beans you
+can use ```-Ddo-system-exit-0``` so that the *driver* terminates with
+```(System/exit 0)```.
 
 ## Resolving project dependencies
 
@@ -572,6 +587,24 @@ there too. So we can run this via the Java-based *driver* as well:
     CP=`lein classpath`
 	java -cp ${CP} javastuff.Driver spring-config-factories.xml a_clojure_bean
 	
+### Shut-down Clojure's agent threadpool (shutdown_agents)
+
+There is one more bean definition that I put in here because we will
+need it for all the remaining examples:
+
+	  <bean id="shutdown_agents" 
+		parent="clojure_fact">
+		<constructor-arg 
+		value="
+		  (require 'spring-break.shutdown-agents)
+		  (spring-break.shutdown-agents/make-shutdown-agent-bean)
+		  " />
+	  </bean>
+
+This bean will participate in the lifecycle of the Spring application
+context and will shut-down the agent threadpool when Spring is
+shut-down.
+
 ## Start Swank
 
 As a *special* side-effect you can start swank:
@@ -596,6 +629,60 @@ application context and to drop any exception that may come out of
 that call (e.g. if the port is already in use).
 
 	lein run spring-config-swank.xml
+
+### Shut-down swank gracefully
+
+Note that the swank server keeps the JVM from exiting even though the
+Spring application context has been shut-down and the main thread has
+completed. This is because there are non-daemon threads running for
+swank.
+
+In ```src/main/clojure/spring_break/swank.clj``` you find an example
+of how to start and *gracefully* shut-down swank. In this example I
+still tried to start swank concurrently via ```future```. Since the
+*driver* is shut-down right after start-up we run the danger of a
+race-condition: the call to ```(stop)``` happens before swank has
+started so calling ```(stop-server)``` will do nothing. So I
+introduced an explicit synchronization via a ```(promise)```. So only
+after swank *did* start-up will ```stop-server``` be called.
+
+Such race-conditions may pop-up in other circumstances as well.
+
+	(defn swank-starter []
+	  (let [state (atom {})
+			started (promise)]
+		(reify
+		  org.springframework.context.SmartLifecycle
+		  (getPhase [this] 0)
+		  (isAutoStartup [this]
+			true)
+		  (isRunning [this]
+			(boolean (:running @state)))
+		  (start [this]
+			(swap! state assoc :running true)
+			(future 
+			  (start-server :port 4007)
+			  (deliver started :started)))
+		  (stop [this runnable]
+			@started
+			(stop-server)
+			(swap! state assoc :running false)
+			(.run runnable)))))
+
+The bean looks like this:
+
+	  <bean id="run_swank" 
+		parent="clojure_fact">
+		<constructor-arg 
+		value="
+		  (require 'spring-break.swank)
+		  (spring-break.swank/swank-starter)
+		  " />
+	  </bean>
+
+And run:
+
+	java -cp ${CP} clojure.main -m spring-break.core spring-config-gracefull-swank.xml
 
 ## Start nrepl
 
@@ -953,10 +1040,10 @@ Now we implement that:
 		  (toString [this] (str @state))
 		  (setFoo [this v]
 			(swap! state assoc :foo v)
-			(printf "+++ after setFoo : %s\n" this))
+			(core/log "after setFoo : %s" this))
 		  (setBar [this v]
 			(swap! state assoc :bar v)
-			(printf "+++ after setBar : %s\n" this)))))
+			(core/log "after setBar : %s" this)))))
 
 Note that there is nothing Spring-specific in this code (no Spring
 classes/interfaces).
@@ -979,7 +1066,8 @@ marker interface ```org.springframework.beans.factory.InitializingBean``` as wel
 		(reify
 		  org.springframework.beans.factory.InitializingBean
 		  (toString [this] (str @state))
-		  (afterPropertiesSet [this] (printf "+++ afterPropertiesSet : %s\n" this)))))
+		  (afterPropertiesSet [this]
+		    (core/log "afterPropertiesSet : %s" this)))))
 
 Using the interfaces binds your code to Spring. You could 
 use ```init-method="<method>"``` instead but then you have to define 
@@ -998,7 +1086,8 @@ The cleanup is similar:
 		(reify
 		  org.springframework.beans.factory.DisposableBean
 		  (toString [this] (str @state))
-		  (destroy [this] (printf "+++ destroy : %s\n" this)))))
+		  (destroy [this]
+            (core/log "destroy : %s" this)))))
 
 Again you could use ```destroy-method="<method>"``` and 
 a ```protocol``` instead of the invasive use of the Spring interface.
@@ -1016,10 +1105,18 @@ details. I put in the code just for completeness:
 		  org.springframework.context.SmartLifecycle
 		  (toString [this] (str @state))
 		  (getPhase [this] 0)
-		  (isAutoStartup [this] (printf "+++ isAutoStartup : %s\n" this) true)
-		  (isRunning [this] (printf "+++ isRunning : %s\n" this) true)
-		  (start [this] (printf "+++ start : %s\n" this))
-		  (stop [this runnable] (printf "+++ stop : %s\n" this) (.run runnable)))))
+		  (isAutoStartup [this]
+			(core/log "isAutoStartup : %s" this)
+			true)
+		  (isRunning [this]
+			(core/log "isRunning : %s" this)
+			(boolean (:running @state)))
+		  (start [this]
+			(core/log "start : %s" this)
+			(swap! state assoc :running true))
+		  (stop [this runnable]
+			(core/log "stop : %s" this)
+			(.run runnable)))))
 
 # Implementing Spring callback interfaces
 
@@ -1349,6 +1446,56 @@ And for just playing around:
 
 	java -cp ${CP} clojure.main -e "(use 'spring-break.jmx) (jmx-invoke \"clojure-beans:name=clj_echo\" \"#=(+ 1 2)\")"
 
+## Shutting down Spring via JMX
+
+When the *driver* is run as a *server-app* we have to shut-down Spring
+via a client JMX call. For this we define ```clj_close_sac```. In
+order to get access to the Spring application context we have to
+implement ```ApplicationContextAware```. Our ```fn-wrapper-of``` does
+not implement this interface so we have to define **two** beans:
+```close_sac_factory``` will receive the Spring application context
+and then ```call```is used as the *factory* for ```clj_close_sac```:
+
+	  <bean id="close_sac_factory" 
+		parent="clojure_fact">
+		<constructor-arg value="
+		  (require 'spring-break.jmx)
+		  (let [sac (atom nil)]
+		    (reify 
+			  org.springframework.context.ApplicationContextAware
+			  java.util.concurrent.Callable
+			  (setApplicationContext [this v] 
+			    (swap! sac (constantly v)))
+			  (call [this]
+			    (spring-break.jmx/fn-wrapper-of ^{:info :close-sac}
+				  (fn [arg]
+			        (.close @sac))))))
+		  " />
+	  </bean>
+
+      <bean id="clj_close_sac" 
+		factory-bean="close_sac_factory"
+		factory-method="call" />
+
+Just to validate that the shut-down works I added ```run_swank``` from above:
+
+	  <bean id="run_swank" 
+		parent="clojure_fact">
+		<constructor-arg 
+		value="
+		  (require 'spring-break.swank)
+		  (spring-break.swank/swank-starter)
+		  " />
+	  </bean>
+
+Now we can start the *server-app*:
+
+	lein trampoline with-profile jmx-server-app run spring-config-jmx.xml
+
+And shut it down like this:
+
+	lein run -m spring-break.jmx invoke clojure-beans:name=clj_close_sac x
+	
 ## Changing mutable state (references) via JMX attributes
 
 When Spring detects a bean that is a JMX MBean it will publish it to

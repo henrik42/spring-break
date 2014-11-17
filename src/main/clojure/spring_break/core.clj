@@ -30,4 +30,7 @@
         (log "Waiting for Spring application context shuttdown ...")
         @closed)
       (.close sac))
-    (log "done.")))
+    (log "done.")
+    (when (System/getProperty "do-system-exit-0")
+      (log "Explicit (System/exit 0).")
+      (System/exit 0))))

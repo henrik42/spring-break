@@ -31,4 +31,13 @@
     </constructor-arg>
   </bean>
 
+  <bean id="shutdown_agents" 
+	parent="clojure_fact">
+    <constructor-arg 
+	value="
+	  (require 'spring-break.shutdown-agents)
+	  (spring-break.shutdown-agents/make-shutdown-agent-bean)
+	  " />
+  </bean>
+
 </beans>

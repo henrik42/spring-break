@@ -23,10 +23,12 @@
         (core/log "after setBar : %s" this))
       
       ;; org.springframework.beans.factory.InitializingBean
-      (afterPropertiesSet [this] (core/log "afterPropertiesSet : %s" this))
+      (afterPropertiesSet [this]
+        (core/log "afterPropertiesSet : %s" this))
 
       ;; org.springframework.beans.factory.DisposableBean
-      (destroy [this] (core/log "destroy : %s" this))
+      (destroy [this]
+        (core/log "destroy : %s" this))
 
       ;; org.springframework.context.SmartLifecycle
       (getPhase [this] 0)
