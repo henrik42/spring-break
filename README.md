@@ -17,8 +17,7 @@ is the standard case for Java-based applications). Using *leiningen*
 makes some tasks a lot easier (like setting up the classpath, running
 tests, etc.) but it does hide details that you have to know about when
 you're not using it. So I'll try to give *plain Java examples* as
-well. Finally I'll show how to *deploy* the code into a Java-based
-Spring application (the *integration case*).
+well.
 
 # Driver 
 
@@ -61,26 +60,26 @@ closing) Spring context is a no-op.
 There are several ways the call to ```close()``` can be initiated:
 
 * **web-app:** In this case you're using one of 
-the ```org.springframework.web.context.WebApplicationContext```
-implementations. These classes will hook into the shutdown of 
-the ```ServletContext``` and call ```close()``` when 
-the ```ServletContext``` shuts down.
+  the ```org.springframework.web.context.WebApplicationContext```
+  implementations. These classes will hook into the shutdown of
+  the ```ServletContext``` and call ```close()``` when 
+  the ```ServletContext``` shuts down.
 
 * **(active) tool-app:** In this case the tool's main thread will
-create the Spring application context, retrieve beans from it
-via ```getBean()``` and use them for whatever the tool is supposed to
-do. So the main thread *drives* the business logic in this case. When
-the tool is done the tool's main thread calls ```close()``` and then
-exists. The call to ```close()``` may be wrapped in a ```finally``` so
-that the shutdown is performed even in case of a non-handled
-exception.
+  create the Spring application context, retrieve beans from it 
+  via ```getBean()``` and use them for whatever the tool is supposed to
+  do. So the main thread *drives* the business logic in this
+  case. When the tool is done the tool's main thread 
+  calls ```close()``` and then exists. The call to ```close()``` may be
+  wrapped in a ```finally``` so that the shutdown is performed even in
+  case of a non-handled exception.
 
 * **(passive) server-app:** In this case the server's main thread will
-only create (but **not use**) the Spring application
-context. Typically some of the beans will be made available to remote
-clients (through beans within the Spring application context itself --
-not the *driver code* -- e.g. RMI, HTTP, JMX). So in this case the
-business logic is driven by calling clients.
+  only create (but **not use**) the Spring application
+  context. Typically some of the beans will be made available to
+  remote clients (through beans within the Spring application context
+  itself -- not the *driver code* -- e.g. RMI, HTTP, JMX). So in this
+  case the business logic is driven by calling clients.
 
   The shutdown must then be initiated *externally* --- e.g. by a
   client call through a bean that eventually calls ```close()```. The
@@ -113,10 +112,20 @@ business logic is driven by calling clients.
   down.
 
   But in these cases your code may not be executed completely (or not
-  at all) because the JVM will give your code only a limited amount of
-  time for completion. So IMHO it's not a good idea to **depend** the
-  gracefull shutdown on ```registerShutdownHook``` and JVM
-  shutdown. Instead I'm using a *controlled call to ```close()```*.
+  at all; SIGKILL) because the JVM will give your code only a limited
+  amount of time for completion. Then again there is the chance of
+  not-exiting (SIGHUP) if the shutdown-hook thread runs into an
+  endless loop.
+  
+  So IMHO it's  not a
+  good    idea    to   **depend**    the    gracefull   shutdown
+  on ```registerShutdownHook```  and JVM  shutdown. Instead  I'm  using a
+  controlled call to ```close()```. Nevertheless I'm using the
+  shutdown hook for cases where my code does not control the shutdown.
+
+The call to ```close()``` will be done either within the *driver*
+(tool-app) or by *business code* (server-app). See *Shutting down
+Spring via JMX* below.
 
 The *driver* I'm using for this project can be used as an *active
 tool* as well as a *passive server* (or both at the same time).
@@ -167,6 +176,10 @@ This is the relevant part of the *driver* code:
 You can run the *driver* as a *server-app* like this:
 
 	lein trampoline with-profile server-app run spring-config-empty.xml
+
+Since there is no business code that closes the Spring application
+context in this case the *driver's* main thread will wait forever and
+the JVM will not exit. You have to kill (ctrl-c) this process.
 
 Note: I'm using ```(spring-break.core/log)``` instead of Clojure's
 print-functions because they use ```clojure.core/*out*``` which is a
