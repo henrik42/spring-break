@@ -188,6 +188,74 @@ and Java stuff (Spring!) at the same time. So in order to see the
 Clojure-output in sync with the Java-output we shouldn't buffer either
 of them.
 
+### Using AbstractApplicationContext.registerShutdownHook
+
+Spring offers
+```org.springframework.context.support.AbstractApplicationContext.registerShutdownHook()```
+which registers a shutdown-hook (i.e. ```Thread``` instance) in your
+current ```Runtime```. This shutdown-hook will call ```doClose()``` on
+the Spring application context (if it has not been closed already).
+
+N.B.: That's why I override ```doClose``` and not ```close``` in the
+*driver*. This way the main *driver* thread (which is waiting on
+```@closed```) will be woken up when the ```close```/```doClose``` has
+completed (initiated either via shutdown-hook or via a call to
+```close()``` from business code). This may or may not be what you
+want. Just remember that the JVM will halt as soon as all
+shutdown-hook threads have completed and thus the main *driver* thread
+may run to completion or it may be halted. Instead of putting the
+registration into the *driver* you could refactor it into a Spring
+bean.
+
+The JVM will call all shutdown-hook when it is about to exit. There
+are several reasons for the JVM to exit:
+
+* (a) ```System/exit``` has been called
+
+* (b) there are only daemon-threads running
+
+* (c) a signal has been received (e.g. ctrl-c, ```kill -HUP```)
+
+Note that there are cases when the JVM will terminate but will not
+call shutdown-hooks:
+
+* (d) ```kill -KILL```
+
+* (e) ```System/halt```
+
+The JVM will run all shutdown-hooks (i.e. ```Thread```s) to completion
+before exiting. If any of those threads does not *complete*
+(i.e. terminate) the JVM will keep on running *forever* (unless
+halted).
+
+Any other running threads keep on running concurrently to the
+shutdown-hook threads.
+
+Once all shutdown-hook threads have terminated the JVM will exit. Even
+if there are any non-daemon-threads running.
+
+If you want to play around with this, have a look at
+```src/main/clojure/no-namespace-scripts/shutdown-hook.clj```. This
+does not use Spring - it's just there to have a mini-app to try out.
+
+You can use ```registerShutdownHook()``` in order to shut-down the
+Spring application context for cases where your own code did not get a
+chance to ```close()``` it explicitly. I would not use it as the
+*standard way* to close down your application though.
+
+The *driver* from above does use it. Notice though that there are some
+unexpected things that may happen.
+
+* the *driver's* main thread may not be able to print ```done.```
+  after the shutdown-hook thread has completed. Usually you will see
+  ```done.``` but there is no guarantee.
+
+* the code that is run by the shutdown-hook thread may start-up things
+  again after they had been closed down (e.g. Clojure's agent
+  threadpool). Since non-daemon-threads will not keep the JVM up after
+  the shutdown-hooks have run, this may not be a problem. But still it
+  may come as a surprise in some situations.
+
 ### Beware of non-daemon threads
 
 The *driver* from above will run the main thread to completion. If
