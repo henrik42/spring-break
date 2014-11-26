@@ -6,17 +6,17 @@
   (let [_ (log "Loading ClassPathXmlApplicationContext from '%s'" conf)
         closed (promise)
         sac (proxy [org.springframework.context.support.ClassPathXmlApplicationContext][conf]
-              (close []
+              (doClose []
                 (try
                   (log "Shutting down Spring application context ...")
-                  (proxy-super close)
+                  (proxy-super doClose)
                   (finally
                     (log "Shutdown completed with %s."
                          (if (proxy-super isActive)
                            "FAIL/still active"
                            "OK/inactive"))
                     (deliver closed :doesnt-matter)))))]
-    ;;(.registerShutdownHook sac)
+    (.registerShutdownHook sac)
     (log "Getting beans: [%s]" bean-names)
     (dorun
      (for [bean-id bean-names
