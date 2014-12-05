@@ -349,12 +349,67 @@ users:
 	java -cp target/spring-break-0.1.0-SNAPSHOT-standalone.jar javastuff.Driver spring-config-empty.xml
 	java -cp target/spring-break-0.1.0-SNAPSHOT-standalone.jar clojure.main -m spring-break.core spring-config-empty.xml
 
-This builds an *uberjar* (which contains all JARs and resources in you
-project dependencies -- i.e. *classpath*) and then runs our Java-based
-driver and the Clojure-based driver.
+This builds an *uberjar* (which contains all classes and resources of
+all of the JARs and resources in you project dependencies --
+i.e. *classpath*) and then runs our Java-based driver and the
+Clojure-based driver.
 
-**TODO: show how to use AOT and run the compiled Clojure code via
-  -jar**
+### uberjar gotcha
+
+There are is a gotcha when using an *uberjar*: each file can only
+exist **once** in the *uberjar* (or in any jar/zip). So if we have a
+resource ```spring-config.xml``` in two of the JARs/resource folders
+we can only put one of them into the *uberjar*. lein will warn us in
+this case.
+
+Try this:
+
+* create dir ```./dummy-data/```
+
+* copy ```./resources/spring-config-empty.xml``` to ```./dummy-data/```
+
+* expand the project's classpath in ```project.clj``` like this:
+
+		:resource-paths ["resources" "dummy-data"]
+
+* then build the *uberjar* again:
+
+		lein uberjar
+		Warning: skipped duplicate file: spring-config-empty.xml
+		Created /home/user/spring-break/target/spring-break-0.1.0-SNAPSHOT.jar
+		Created /home/user/spring-break/target/spring-break-0.1.0-SNAPSHOT-standalone.jar
+
+You will be warned about the duplicate. If you want to take care of
+this case automatically, you can tell leiningen how to *process the
+duplicate files*: in this case I deciced to just throw an exception
+(see ```project.clj```)
+
+	:uberjar-merge-with { #".*" [fail-fn fail-fn fail-fn]}
+
+**TODO: this does not work like expected/described: seems the fail-fn
+  is not executed!**
+
+There seems to be a bug in lein. I get:
+
+	lein uberjar
+	Warning: skipped duplicate file: spring-config-empty.xml
+	Created /home/user/spring-break/target/spring-break-0.1.0-SNAPSHOT.jar
+	java.util.zip.ZipException: ZIP file must have at least one entry
+		at java.util.zip.ZipOutputStream.finish(ZipOutputStream.java:321)
+		at java.util.zip.DeflaterOutputStream.close(DeflaterOutputStream.java:163)
+		at java.util.zip.ZipOutputStream.close(ZipOutputStream.java:338)
+		at leiningen.uberjar$uberjar$fn__3657.invoke(uberjar.clj:137)
+		at leiningen.uberjar$uberjar.invoke(uberjar.clj:137)
+		at leiningen.uberjar$uberjar.invoke(uberjar.clj:149)
+	[...]
+
+### Running -jar uberjar
+
+Since the namespace ```spring-break.core``` is AOT-compiled and has a
+```(:gen-class)``` directive, we can run (see
+```spring-break-0.1.0-SNAPSHOT-standalone.jar!/meta-inf/manifest.mf```):
+
+	java -jar target/spring-break-0.1.0-SNAPSHOT-standalone.jar spring-config-empty.xml
 
 # Defining Clojure-based Spring beans
 

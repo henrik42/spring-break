@@ -1,4 +1,6 @@
-(ns spring-break.core)
+(ns spring-break.core
+  (:gen-class))
+
 (defn log [fmt & args]
   (.println System/out (apply format (str "+++ " fmt) args)))
 
