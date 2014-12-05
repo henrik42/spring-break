@@ -190,8 +190,8 @@ of them.
 
 ### Using AbstractApplicationContext.registerShutdownHook
 
-Spring offers
-```org.springframework.context.support.AbstractApplicationContext.registerShutdownHook()```
+Spring 
+offers ```org.springframework.context.support.AbstractApplicationContext.registerShutdownHook()```
 which registers a shutdown-hook (i.e. ```Thread``` instance) in your
 current ```Runtime```. This shutdown-hook will call ```doClose()``` on
 the Spring application context (if it has not been closed already).
@@ -207,7 +207,7 @@ may run to completion or it may be halted. Instead of putting the
 registration into the *driver* you could refactor it into a Spring
 bean.
 
-The JVM will call all shutdown-hook when it is about to exit. There
+The JVM will call all shutdown-hooks when it is about to exit. There
 are several reasons for the JVM to exit:
 
 * (a) ```System/exit``` has been called
@@ -405,9 +405,9 @@ There seems to be a bug in lein. I get:
 
 ### Running -jar uberjar
 
-Since the namespace ```spring-break.core``` is AOT-compiled and has a
-```(:gen-class)``` directive, we can run (see
-```spring-break-0.1.0-SNAPSHOT-standalone.jar!/meta-inf/manifest.mf```):
+Since the namespace ```spring-break.core``` is AOT-compiled and has 
+a ```(:gen-class)``` directive, we can run 
+(see ```spring-break-0.1.0-SNAPSHOT-standalone.jar!/meta-inf/manifest.mf```):
 
 	java -jar target/spring-break-0.1.0-SNAPSHOT-standalone.jar spring-config-empty.xml
 
