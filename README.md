@@ -22,10 +22,7 @@ well.
 # Driver 
 
 We'll need a *driver* app to run our code. We have one in Clojure and
-one in Java (just to notice that there are 38 braces in the Java code
-but only 36 in the Clojure code ;-)
-
-**TODO: count again!**
+one in Java.
 
 ## Clojure
 
